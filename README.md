@@ -18,7 +18,7 @@ CrystalCare fuses ancient sound healing principles with advanced mathematical an
 
 ## Modes
 
-CrystalCare offers five frequency modes:
+CrystalCare offers seven frequency modes:
 
 | Mode | Frequencies | Purpose |
 |------|------------|---------|
@@ -27,6 +27,8 @@ CrystalCare offers five frequency modes:
 | **Atlantean Cosmic** | 136.10, 194.18, 211.44, 303 Hz | Planetary resonance, cosmic alignment |
 | **Combined Mode** | Sacred Geometry + Flower of Life ratios | Holistic balance, comprehensive healing |
 | **Triple Helix DNA Activation** | DNA-inspired ratios (1.0, 1.2, 1.4) | Deep activation, unconscious rewiring |
+| **Taygetan Resonances** | Binaural sync pairs based on sacred constants (sqrt(2), e, pi, PHI) | DNA activation with stereo binaural beating |
+| **Dimensional Journey** | Cycles through all frequency sets in phases | 1D-9D realignment, multidimensional traversal |
 
 ## Features
 
