@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Numba JIT cache
+*.nbc
+*.nbi
+
+# Compiled extensions
+*.pyd
+
+# Nuitka build artifacts
+main.build/
+main.dist/
+main.onefile-build/
+*.exe
+
+# Reserve (historical snapshots - git handles history now)
+reserve/
+
+# Claude Code local settings
+.claude/
+
+# Debug/temp files
+nul
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
