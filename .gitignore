@@ -20,8 +20,10 @@ main.onefile-build/
 # Reserve (historical snapshots - git handles history now)
 reserve/
 
-# Claude Code local settings
+# Claude Code local settings and docs
 .claude/
+CLAUDE.md
+conda.md
 
 # Debug/temp files
 nul
