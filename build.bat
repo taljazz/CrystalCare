@@ -161,6 +161,45 @@ echo.
 echo Size:
 for %%A in (CrystalCare.exe) do echo   %%~zA bytes (%%~nxA)
 echo.
+
+REM ============================================================
+REM Package into CrystalCare.zip
+REM ============================================================
+echo [6/6] Packaging CrystalCare.zip...
+
+if not exist CrystalCare.exe (
+    echo [ERROR] CrystalCare.exe not found - skipping zip packaging
+    goto :skip_zip
+)
+
+REM Delete existing zip if present
+if exist CrystalCare.zip (
+    echo Removing existing CrystalCare.zip...
+    del CrystalCare.zip
+)
+
+REM Check for guide.html
+if not exist guide.html (
+    echo [WARNING] guide.html not found - zip will only contain CrystalCare.exe
+    powershell -NoProfile -Command "Compress-Archive -Path 'CrystalCare.exe' -DestinationPath 'CrystalCare.zip' -Force"
+) else (
+    powershell -NoProfile -Command "Compress-Archive -Path 'CrystalCare.exe','guide.html' -DestinationPath 'CrystalCare.zip' -Force"
+)
+
+if errorlevel 1 (
+    echo [ERROR] Failed to create CrystalCare.zip
+    goto :skip_zip
+)
+
+if exist CrystalCare.zip (
+    echo [OK] CrystalCare.zip created successfully
+    for %%A in (CrystalCare.zip) do echo   %%~zA bytes (%%~nxA)
+) else (
+    echo [ERROR] CrystalCare.zip was not created
+)
+
+:skip_zip
+echo.
 echo ============================================================
 echo Distribution Checklist:
 echo ============================================================
@@ -175,5 +214,7 @@ echo    - Save to WAV
 echo    - Batch save
 echo    - Open Guide (guide.html is embedded)
 echo 4. For sessions over 60 seconds, verify sacred layers activate
+echo.
+echo Distribute CrystalCare.zip - it contains CrystalCare.exe and guide.html
 echo.
 pause
