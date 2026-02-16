@@ -43,7 +43,13 @@ class NumericValidator(wx.Validator):
 
     def Validate(self, parent) -> bool:
         text_ctrl = self.GetWindow()
-        text = text_ctrl.GetValue()
+        text = text_ctrl.GetValue().strip()
+        if not text:
+            text_ctrl.SetBackgroundColour(wx.Colour(255, 192, 192))
+            text_ctrl.Refresh()
+            if self.callback:
+                self.callback("Please enter a value.")
+            return False
         try:
             value = float(text)
             if value <= 0:
@@ -73,6 +79,16 @@ class CrystalCareFrame(wx.Frame):
     # Thread join timeout in seconds
     THREAD_JOIN_TIMEOUT = 5.0
 
+    FREQUENCY_MODES = {
+        0: "Standard",
+        1: "Solfeggio",
+        2: "Fibonacci",
+        3: "Pythagorean",
+        4: "Triple Helix DNA Activation",
+        5: "Taygetan Binaural",
+        6: "Dimensional Shift",
+    }
+
     def __init__(self, parent, title: str,
                  frequency_manager: FrequencyManager,
                  audio_processor: AudioProcessor,
@@ -82,6 +98,7 @@ class CrystalCareFrame(wx.Frame):
         self.frequency_manager = frequency_manager
         self.audio_processor = audio_processor
         self.sound_player = sound_player
+        self.sound_generator = sound_player.sound_generator
         self.user_guide_manager = user_guide_manager
         self.init_ui()
         self.Centre()
@@ -90,6 +107,7 @@ class CrystalCareFrame(wx.Frame):
         self.current_thread: Optional[threading.Thread] = None
         self._thread_lock = threading.Lock()  # Protect thread reference access
         self._thread_timer: Optional[wx.Timer] = None  # Timer for non-blocking thread completion
+        self._is_closing = False  # Guard against wx.CallAfter on destroyed window
 
         # Bind close event for graceful shutdown
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -153,6 +171,10 @@ class CrystalCareFrame(wx.Frame):
         self.update_status(message)
 
     def on_play(self, event) -> None:
+        with self._thread_lock:
+            if self.current_thread is not None and self.current_thread.is_alive():
+                self.update_status("An operation is already in progress.")
+                return
         try:
             freq_selection = self.freq_choice.GetSelection()
             frequencies = self.frequency_manager.get_frequencies(freq_selection)
@@ -178,13 +200,12 @@ class CrystalCareFrame(wx.Frame):
             self.toggle_controls(show_stop=True)
             self.stop_event.clear()
             def on_complete() -> None:
+                if self._is_closing:
+                    return
                 wx.CallAfter(self.toggle_controls, show_stop=False)
-                if freq_selection == 4:
-                    msg = "Triple Helix Mode completed."
-                elif freq_selection == 5:
-                    msg = "Taygetan Resonance completed."
-                elif freq_selection == 6:
-                    msg = "Dimensional Journey completed."
+                mode_name = self.FREQUENCY_MODES.get(freq_selection, "")
+                if freq_selection in (4, 5, 6):
+                    msg = f"{mode_name} completed."
                 else:
                     msg = "Playback completed."
                 wx.CallAfter(self.update_status, msg)
@@ -210,6 +231,10 @@ class CrystalCareFrame(wx.Frame):
             self.update_status(f"Error: {e}")
 
     def on_save(self, event) -> None:
+        with self._thread_lock:
+            if self.current_thread is not None and self.current_thread.is_alive():
+                self.update_status("An operation is already in progress.")
+                return
         try:
             freq_selection = self.freq_choice.GetSelection()
             frequencies = self.frequency_manager.get_frequencies(freq_selection)
@@ -239,13 +264,12 @@ class CrystalCareFrame(wx.Frame):
                 self.toggle_controls(show_stop=True)
                 self.stop_event.clear()
                 def on_complete() -> None:
+                    if self._is_closing:
+                        return
                     wx.CallAfter(self.toggle_controls, show_stop=False)
-                    if freq_selection == 4:
-                        msg = f"Triple Helix Mode saved as {filename}."
-                    elif freq_selection == 5:
-                        msg = f"Taygetan Resonance saved as {filename}."
-                    elif freq_selection == 6:
-                        msg = f"Dimensional Journey saved as {filename}."
+                    mode_name = self.FREQUENCY_MODES.get(freq_selection, "")
+                    if freq_selection in (4, 5, 6):
+                        msg = f"{mode_name} saved as {filename}."
                     else:
                         msg = f"Resonance saved as {filename}."
                     wx.CallAfter(self.update_status, msg)
@@ -353,6 +377,7 @@ class CrystalCareFrame(wx.Frame):
     def on_close(self, event) -> None:
         """Graceful shutdown - stop any running operations before closing (non-blocking)."""
         logging.debug("Application closing - initiating graceful shutdown")
+        self._is_closing = True
 
         # Signal stop to any running operation
         self.stop_event.set()
@@ -379,6 +404,11 @@ class CrystalCareFrame(wx.Frame):
             logging.warning("Thread did not terminate during shutdown - closing anyway")
         else:
             logging.debug("Graceful shutdown complete")
+        # Stop timer before destroying window to prevent stale timer events
+        if hasattr(self, '_thread_timer') and self._thread_timer is not None and self._thread_timer.IsRunning():
+            self._thread_timer.Stop()
+        # Shut down shared sacred layer thread pool
+        self.sound_generator.shutdown()
         self.Destroy()  # Close the window
 
     def toggle_controls(self, show_stop: bool) -> None:
@@ -411,7 +441,12 @@ class CrystalCareFrame(wx.Frame):
         self.user_guide_manager.open_guide(update_status=self.update_status)
 
     def update_status(self, message: str) -> None:
-        self.status_text.AppendText(message + "\n")
+        if self._is_closing:
+            return
+        if wx.IsMainThread():
+            self.status_text.AppendText(message + "\n")
+        else:
+            wx.CallAfter(self.status_text.AppendText, message + "\n")
 
     def validate_input(self, input_str: str) -> bool:
         try:
@@ -432,7 +467,29 @@ class CrystalCareFrame(wx.Frame):
             return False
 
     def on_batch_save(self, event) -> None:
+        with self._thread_lock:
+            if self.current_thread is not None and self.current_thread.is_alive():
+                self.update_status("An operation is already in progress.")
+                return
         try:
+            # Validate duration first before showing dialogs
+            duration_str = self.duration_text.GetValue().strip()
+            if not self.validate_input(duration_str):
+                return
+            duration_minutes = float(duration_str)
+            if duration_minutes > 60:
+                self.update_status("Error: Duration must be <= 60 minutes.")
+                self.duration_text.SetBackgroundColour(wx.Colour(255, 192, 192))
+                self.duration_text.Refresh()
+                return
+            duration_seconds = duration_minutes * 60
+
+            freq_selection = self.freq_choice.GetSelection()
+            frequencies = self.frequency_manager.get_frequencies(freq_selection)
+            if not frequencies and freq_selection != 6:
+                self.update_status("Error: No frequencies available for the selected set.")
+                return
+
             dlg = wx.NumberEntryDialog(self, "Enter the number of tones to save:", "Batch Save", "Number of Tones", 1, 1, 1000)
             if dlg.ShowModal() == wx.ID_OK:
                 num_tones = dlg.GetValue()
@@ -449,26 +506,18 @@ class CrystalCareFrame(wx.Frame):
                 dir_dlg.Destroy()
                 self.update_status("Batch save cancelled by user.")
                 return
-            freq_selection = self.freq_choice.GetSelection()
-            frequencies = self.frequency_manager.get_frequencies(freq_selection)
-            if not frequencies and freq_selection != 6:
-                self.update_status("Error: No frequencies available for the selected set.")
-                self.toggle_controls(show_stop=False)
-                return
+
             if freq_selection == 6:
                 base_freqs = [432] * num_tones  # Default for dimensional
             else:
-                base_freqs = [np.random.choice(frequencies) if frequencies and not isinstance(frequencies[0], tuple) else np.random.choice([pair[0] for pair in frequencies]) if frequencies else [432] for _ in range(num_tones)] 
+                base_freqs = [np.random.choice(frequencies) if frequencies and not isinstance(frequencies[0], tuple) else np.random.choice([pair[0] for pair in frequencies]) if frequencies else [432] for _ in range(num_tones)]
             logging.debug(f"Selected base frequencies for Batch Save: {base_freqs}")
-            duration_str = self.duration_text.GetValue().strip()
-            if not self.validate_input(duration_str):
-                return
-            duration_minutes = float(duration_str)
-            duration_seconds = duration_minutes * 60
             self.update_status(f"Starting batch save of {num_tones} tones to {save_dir}...")
             self.toggle_controls(show_stop=True)
             self.stop_event.clear()
             def on_complete() -> None:
+                if self._is_closing:
+                    return
                 wx.CallAfter(self.toggle_controls, show_stop=False)
                 wx.CallAfter(self.update_status, "Batch save completed.")
             # Thread-safe thread creation and tracking

@@ -8,7 +8,7 @@ echo ============================================================
 echo.
 
 REM Set the conda environment Python path
-set CONDA_PYTHON=C:\Users\Thomas\.conda\envs\cc\python.exe
+set CONDA_PYTHON=%USERPROFILE%\.conda\envs\cc\python.exe
 
 REM Verify conda Python exists
 if not exist "%CONDA_PYTHON%" (
@@ -57,7 +57,8 @@ if not exist simplex5d.cp*.pyd (
         exit /b 1
     )
 )
-echo [OK] C++ extension found
+for %%F in (simplex5d.cp*.pyd) do set PYD_FILE=%%F
+echo [OK] C++ extension found: %PYD_FILE%
 echo.
 
 REM Check for required files
@@ -109,6 +110,8 @@ echo.
   --standalone ^
   --onefile ^
   --enable-plugin=numpy ^
+  --enable-plugin=anti-bloat ^
+  --lto=yes ^
   --include-module=simplex5d ^
   --include-module=frequencies ^
   --include-module=SoundGenerator ^
@@ -122,7 +125,7 @@ echo.
   --include-package=scipy.io ^
   --include-package=sounddevice ^
   --include-package=wx ^
-  --include-data-files=simplex5d.cp310-win_amd64.pyd=simplex5d.cp310-win_amd64.pyd ^
+  --include-data-files=%PYD_FILE%=%PYD_FILE% ^
   --windows-disable-console ^
   --assume-yes-for-downloads ^
   --show-progress ^

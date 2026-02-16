@@ -1,10 +1,11 @@
 import numpy as np
 import sounddevice as sd
-from scipy.io.wavfile import write
+import wave
 import os
 from typing import Optional, Callable, List
 import logging
 import threading
+import gc
 import wx
 
 class SoundPlayer:
@@ -21,8 +22,8 @@ class SoundPlayer:
                    dimensional_mode: bool = False,
                    **kwargs) -> None:
         """
-        Play sound using event-driven callbacks instead of polling.
-        Uses threading.Event for efficient stop signaling and playback completion.
+        Play sound with 50ms poll-based stream monitoring.
+        Uses threading.Event for efficient stop signaling.
         """
         try:
             progress_gauge = kwargs.get('progress_gauge')
@@ -45,18 +46,12 @@ class SoundPlayer:
             if update_status:
                 update_status("Playing sound...")
 
-            # Event-driven playback using finished_callback instead of polling
+            # Poll-based playback monitoring with 50ms responsiveness
             playback_finished = threading.Event()
             was_stopped = False
 
-            def on_playback_finished():
-                """Callback invoked when playback completes naturally."""
-                playback_finished.set()
-
-            # Start playback with completion callback
             sd.play(sound_data, samplerate=sample_rate, blocking=False)
 
-            # Use OutputStream's finished callback by checking stream status efficiently
             # Wait for either: playback completion OR stop_event
             while not playback_finished.is_set():
                 # Check stop_event with short timeout for responsive cancellation
@@ -72,6 +67,10 @@ class SoundPlayer:
                 if stream is None or not stream.active:
                     playback_finished.set()
                     break
+
+            # Free sound data after playback
+            del sound_data
+            gc.collect()
 
             if not was_stopped and update_status:
                 update_status("Playback finished.")
@@ -117,10 +116,27 @@ class SoundPlayer:
                 if update_status:
                     update_status("Sound generation was stopped. Nothing to save.")
                 return
-            scaled_data = np.int16(sound_data * (32767 / max_val))
+            scale_factor = np.float32(32767.0 / max_val)
             if update_status:
                 update_status("Saving to WAV file...")
-            write(filename, sample_rate, scaled_data)
+
+            # Chunked WAV writing: only one chunk's worth of int16 data at a time
+            n_channels = sound_data.shape[1] if sound_data.ndim == 2 else 1
+            with wave.open(filename, 'wb') as wf:
+                wf.setnchannels(n_channels)
+                wf.setsampwidth(2)  # 16-bit
+                wf.setframerate(sample_rate)
+
+                chunk_size = sample_rate * 10  # 10 seconds at a time
+                for start in range(0, len(sound_data), chunk_size):
+                    chunk = sound_data[start:start + chunk_size]
+                    scaled = np.int16(chunk * scale_factor)
+                    wf.writeframes(scaled.tobytes())
+                    del scaled
+
+            del sound_data
+            gc.collect()
+
             if not (stop_event and stop_event.is_set()) and update_status:
                 update_status(f"Resonance saved as {filename}.")
         except IOError as e:
@@ -172,13 +188,29 @@ class SoundPlayer:
                     if stop_event and stop_event.is_set():
                         return None
 
-                    # Scale and save
+                    # Scale and save with chunked WAV writing
                     max_val = np.max(np.abs(sound_data))
-                    if max_val > 0:
-                        scaled_data = np.int16(sound_data / max_val * 32767)
-                    else:
-                        scaled_data = np.int16(sound_data * 32767)
-                    write(filename, sample_rate, scaled_data)
+                    if max_val == 0:
+                        logging.warning(f"Tone {tone_index + 1} generated silence, skipping.")
+                        del sound_data
+                        return None
+                    scale_factor = np.float32(32767.0 / max_val)
+
+                    n_channels = sound_data.shape[1] if sound_data.ndim == 2 else 1
+                    with wave.open(filename, 'wb') as wf:
+                        wf.setnchannels(n_channels)
+                        wf.setsampwidth(2)  # 16-bit
+                        wf.setframerate(sample_rate)
+
+                        chunk_size = sample_rate * 10  # 10 seconds at a time
+                        for start in range(0, len(sound_data), chunk_size):
+                            chunk = sound_data[start:start + chunk_size]
+                            scaled = np.int16(chunk * scale_factor)
+                            wf.writeframes(scaled.tobytes())
+                            del scaled
+
+                    del sound_data
+                    gc.collect()
 
                     return filename
                 except Exception as e:
@@ -230,5 +262,4 @@ class SoundPlayer:
             sd.stop()
             logging.debug("Playback stopped successfully.")
         except Exception as e:
-            logging.exception("Error stopping playback.")
-            raise e
+            logging.error(f"Error stopping playback: {e}")

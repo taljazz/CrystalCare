@@ -8,7 +8,7 @@ import threading
 import gc
 from concurrent.futures import ThreadPoolExecutor
 from simplex5d import Simplex5D
-from numba import njit
+from numba import njit, prange
 
 # JIT-compiled constants
 TWO_PI = 2.0 * np.pi
@@ -21,52 +21,56 @@ PHI = 1.618033988749895
 @njit(fastmath=True, cache=True)
 def jit_cross_modulate_wave(base_freq: float, mod_freq: float, t: np.ndarray,
                             mod_depth: float) -> np.ndarray:
-    """JIT-compiled cross-modulation wave generation."""
+    """JIT-compiled cross-modulation wave generation (float32 native)."""
     mod_signal = np.sin(TWO_PI * mod_freq * t) * mod_depth
-    return np.sin(TWO_PI * base_freq * t + mod_signal)
+    return np.sin(TWO_PI * base_freq * t + mod_signal).astype(np.float32)
 
 @njit(fastmath=True, cache=True)
 def jit_wave_shaping(signal: np.ndarray, shape_factor: float) -> np.ndarray:
-    """JIT-compiled wave shaping with tanh."""
-    clipped = np.clip(signal, -1.0, 1.0)
-    return np.tanh(shape_factor * clipped) * 1.2
+    """JIT-compiled wave shaping with tanh (float32 native)."""
+    clipped = np.clip(signal, np.float32(-1.0), np.float32(1.0))
+    return (np.tanh(shape_factor * clipped) * np.float32(1.2)).astype(np.float32)
 
 @njit(fastmath=True, cache=True)
 def jit_normalize_signal(signal: np.ndarray, scale_factor: float) -> np.ndarray:
     """JIT-compiled signal normalization."""
     max_val = np.max(np.abs(signal))
     if max_val > 0:
-        return signal / (max_val * scale_factor)
+        return (signal / (max_val * np.float32(scale_factor))).astype(np.float32)
     return signal
 
 @njit(fastmath=True, cache=True)
 def jit_exponential_decay(length: int, decay_rate: float) -> np.ndarray:
-    """JIT-compiled exponential decay for reverb IR."""
-    return np.exp(-np.linspace(0, decay_rate * 1.8, length))
+    """JIT-compiled exponential decay for reverb IR (float32 native)."""
+    return np.exp(-np.linspace(np.float32(0), np.float32(decay_rate * 1.8), length)).astype(np.float32)
 
 @njit(fastmath=True, cache=True)
 def jit_pan_curve_tanh(pan_curve: np.ndarray, scale: float,
                        clip_min: float, clip_max: float) -> np.ndarray:
-    """JIT-compiled pan curve processing."""
-    return np.clip(np.tanh(pan_curve * scale), clip_min, clip_max)
+    """JIT-compiled pan curve processing (float32 native)."""
+    return np.clip(np.tanh(pan_curve * scale), clip_min, clip_max).astype(np.float32)
 
-@njit(fastmath=True, cache=True)
+@njit(fastmath=True, cache=True, parallel=True)
 def jit_generate_harmonics_vectorized(frequencies: np.ndarray, t: np.ndarray,
                                        envelope: np.ndarray, lfo: np.ndarray,
                                        mod_depths: np.ndarray) -> np.ndarray:
-    """JIT-compiled vectorized harmonic generation (float32 native)."""
+    """JIT-compiled vectorized harmonic generation (float32 native, parallel)."""
     n_samples = len(t)
     n_freqs = len(frequencies)
-    result = np.zeros(n_samples, dtype=np.float32)  # Use float32 throughout
+    # Per-frequency results to allow parallel reduction (avoid race on shared result)
+    per_freq = np.zeros((n_freqs, n_samples), dtype=np.float32)
 
-    for i in range(n_freqs):
+    for i in prange(n_freqs):
         f = frequencies[i]
         mod_freq = f * 0.5
         mod_signal = np.sin(TWO_PI * mod_freq * t) * mod_depths[i]
         wave = np.sin(TWO_PI * f * t + mod_signal)
         scale = np.float32(0.015 / (i + 1))
-        result += wave * envelope * scale * lfo
+        per_freq[i] = wave * envelope * scale * lfo
 
+    result = np.zeros(n_samples, dtype=np.float32)
+    for i in range(n_freqs):
+        result += per_freq[i]
     return result
 
 @njit(fastmath=True, cache=True)
@@ -91,21 +95,21 @@ def jit_stereo_gains(pan_h: np.ndarray, depth: np.ndarray,
 @njit(fastmath=True, cache=True)
 def jit_quantum_harmonic(t: np.ndarray, base_freq: float,
                          gamma: np.ndarray) -> np.ndarray:
-    """JIT-compiled quantum harmonic interference computation."""
+    """JIT-compiled quantum harmonic interference computation (float32 native)."""
     f1 = base_freq
     f2 = base_freq * 1.41421356237   # sqrt(2)
     f3 = base_freq * 2.71828182846   # e
     f4 = base_freq * 3.14159265359   # pi
 
-    alpha = 0.25 * np.sin(0.03 * np.pi * t)
-    beta = 0.2 * np.cos(0.02 * np.pi * t)
+    alpha = np.float32(0.25) * np.sin(np.float32(0.03) * np.float32(np.pi) * t)
+    beta = np.float32(0.2) * np.cos(np.float32(0.02) * np.float32(np.pi) * t)
 
     wave1 = np.sin(TWO_PI * f1 * t + alpha)
     wave2 = np.sin(TWO_PI * f2 * t + beta)
     wave3 = np.sin(TWO_PI * f3 * t + gamma)
-    wave4 = np.sin(TWO_PI * f4 * t + gamma * 0.7)
+    wave4 = np.sin(TWO_PI * f4 * t + gamma * np.float32(0.7))
 
-    return (wave1 + wave2 + wave3 + wave4) / 3.8 + 0.15 * np.sin(TWO_PI * 7.83 * t)
+    return ((wave1 + wave2 + wave3 + wave4) / np.float32(3.8) + np.float32(0.15) * np.sin(TWO_PI * np.float32(7.83) * t)).astype(np.float32)
 
 class AudioProcessor:
     """
@@ -156,12 +160,13 @@ class AudioProcessor:
         self.nyquist = 0.5 * sample_rate
 
         # Simplex5D pool - avoid repeated object creation
-        self._simplex_pool = [Simplex5D(seed) for seed in range(10)]
+        self._simplex_pool = [Simplex5D(seed) for seed in range(16)]
         self._simplex_index = 0
         self._simplex_lock = threading.Lock()  # Thread-safe pool access
 
         # Pre-computed filter coefficients cache
         self._filter_cache = {}
+        self._filter_cache_lock = threading.Lock()
         self._precompute_filters()
 
         # Reverb impulse response cache (keyed by reverb_length)
@@ -189,9 +194,10 @@ class AudioProcessor:
     def _get_filter(self, filter_type: str, cutoff: float, order: int) -> tuple:
         """Get cached filter coefficients or compute new ones."""
         key = (filter_type, cutoff, order)
-        if key not in self._filter_cache:
-            self._filter_cache[key] = butter(order, cutoff / self.nyquist, btype=filter_type)
-        return self._filter_cache[key]
+        with self._filter_cache_lock:
+            if key not in self._filter_cache:
+                self._filter_cache[key] = butter(order, cutoff / self.nyquist, btype=filter_type)
+            return self._filter_cache[key]
 
     def geometric_modulation(self, t: np.ndarray, ratios: Dict[str, float],
                              modulation_index: float = 0.2,
@@ -199,9 +205,16 @@ class AudioProcessor:
         if stop_event and stop_event.is_set():
             logging.debug("Geometric modulation stopped early due to stop_event.")
             return np.zeros_like(t, dtype=np.float32)
+        ratios_values = list(ratios.values())
+        if len(ratios_values) > 10:
+            # Sequential processing for large ratio sets to avoid huge 2D intermediates
+            modulation = np.zeros_like(t, dtype=np.float32)
+            for ratio in ratios_values:
+                modulation += np.float32(modulation_index) * np.sin(TWO_PI * np.float32(ratio) * t)
+            return modulation
         # Vectorized: convert ratios to array, broadcast compute all sines at once
-        ratios_array = np.array(list(ratios.values()), dtype=np.float32)[:, np.newaxis]
-        modulation = (modulation_index * np.sin(TWO_PI * ratios_array * t)).sum(axis=0)
+        ratios_array = np.array(ratios_values, dtype=np.float32)[:, np.newaxis]
+        modulation = (np.float32(modulation_index) * np.sin(TWO_PI * ratios_array * t)).sum(axis=0)
         return modulation.astype(np.float32)
     def low_pass_filter(self, signal: np.ndarray, cutoff: float = 2200,
                         sample_rate: int = 48000, order: int = 4,
@@ -210,11 +223,12 @@ class AudioProcessor:
             logging.debug("Low pass filter stopped early due to stop_event.")
             return signal  # Return unfiltered signal for graceful degradation
         nyquist = 0.5 * sample_rate
-        # Simplified: use random cutoff variation instead of computing full sine array
+        # Intentionally not using _get_filter() here: the random cutoff variation
+        # produces a different normalized_cutoff each call, defeating caching.
         cutoff_variation = np.random.uniform(-25, 25)  # ±25 Hz variation
         normalized_cutoff = np.clip((cutoff + cutoff_variation) / nyquist, 0.1, 0.99)
         b, a = butter(order, normalized_cutoff, btype='low', analog=False)
-        return lfilter(b, a, signal.astype(np.float32))
+        return lfilter(b, a, signal).astype(np.float32)
     def exponential_fade(self, segment: np.ndarray, fade_length: int) -> np.ndarray:
         if segment.size < 2 * fade_length:
             return segment
@@ -258,27 +272,30 @@ class AudioProcessor:
         t_scaled = np.linspace(0, 1, total_samples, dtype=np.float32)
 
         # Generate single full-length Simplex noise (reduces 4 calls to 1)
-        full_noise = simplex.generate_noise(t_scaled * 0.04, 0.0, 0.0, 0.0, 0.0)
+        full_noise = simplex.generate_noise(t_scaled * np.float32(0.04), 0.0, 0.0, 0.0, 0.0)
+        del t_scaled
 
         attack_curve = np.linspace(0, 1, a_samples, dtype=np.float32) ** 1.5
-        attack_noise = full_noise[:a_samples] * 0.05
-        envelope[:a_samples] = np.clip(attack_curve + attack_noise, 0, 1)
+        envelope[:a_samples] = np.clip(attack_curve + full_noise[:a_samples] * np.float32(0.05), 0, 1)
+        del attack_curve
 
         decay_curve = np.linspace(1, sustain, d_samples, dtype=np.float32) ** 1.2
-        decay_wobble = np.random.uniform(0.015, 0.035) * np.sin(np.linspace(0, np.pi * (1 + chaos * 0.3), d_samples, dtype=np.float32))
-        decay_noise = full_noise[a_samples:a_samples+d_samples] * 0.03
-        envelope[a_samples:a_samples+d_samples] = np.clip(decay_curve + decay_wobble + decay_noise, sustain, 1)
+        decay_wobble = np.float32(np.random.uniform(0.015, 0.035)) * np.sin(np.linspace(0, np.float32(np.pi * (1 + chaos * 0.3)), d_samples, dtype=np.float32))
+        envelope[a_samples:a_samples+d_samples] = np.clip(decay_curve + decay_wobble + full_noise[a_samples:a_samples+d_samples] * np.float32(0.03), sustain, 1)
+        del decay_curve, decay_wobble
 
         sustain_curve = np.full(s_samples, sustain, dtype=np.float32)
-        sustain_wobble = np.random.uniform(0.01, 0.025) * np.sin(2 * np.pi * np.linspace(0, 1.5 + chaos * 0.5, s_samples, dtype=np.float32))
-        sustain_noise = full_noise[a_samples+d_samples:a_samples+d_samples+s_samples] * 0.04
-        envelope[a_samples+d_samples:a_samples+d_samples+s_samples] = np.clip(sustain_curve + sustain_wobble + sustain_noise, sustain * 0.8, 1)
+        sustain_wobble = np.float32(np.random.uniform(0.01, 0.025)) * np.sin(TWO_PI * np.linspace(0, np.float32(1.5 + chaos * 0.5), s_samples, dtype=np.float32))
+        envelope[a_samples+d_samples:a_samples+d_samples+s_samples] = np.clip(sustain_curve + sustain_wobble + full_noise[a_samples+d_samples:a_samples+d_samples+s_samples] * np.float32(0.04), sustain * 0.8, 1)
+        del sustain_curve, sustain_wobble
 
-        release_curve = np.linspace(sustain, 0, r_samples, dtype=np.float32) ** 1.5
-        release_noise = full_noise[-r_samples:] * 0.05
-        envelope[-r_samples:] = np.clip(release_curve + release_noise, 0, sustain)
-       
-        envelope *= np.random.uniform(0.95, 1.05)
+        if r_samples > 0:
+            release_curve = np.linspace(sustain, 0, r_samples, dtype=np.float32) ** 1.5
+            envelope[-r_samples:] = np.clip(release_curve + full_noise[-r_samples:] * np.float32(0.05), 0, sustain)
+            del release_curve
+        del full_noise
+
+        envelope *= np.float32(np.random.uniform(0.95, 1.05))
         return envelope
     def dynamic_cross_modulate(self, base_freq: float, mod_freq: float, t: np.ndarray,
                                stop_event: Optional[threading.Event] = None) -> np.ndarray:
@@ -286,15 +303,16 @@ class AudioProcessor:
             logging.debug("Dynamic cross modulation stopped early due to stop_event.")
             return np.zeros_like(t, dtype=np.float32)
         mod_depth = np.random.uniform(0.15, 0.35)
-        return jit_cross_modulate_wave(base_freq, mod_freq, t, mod_depth).astype(np.float32)
+        return jit_cross_modulate_wave(base_freq, mod_freq, t, mod_depth)  # Already float32
     def microtonal_lfo(self, t: np.ndarray, base_frequency: float,
                        stop_event: Optional[threading.Event] = None) -> np.ndarray:
-        phi = 1.618
-        lfo1 = base_frequency * (phi ** np.random.uniform(-0.05, 0.05))
+        lfo1 = base_frequency * (PHI ** np.random.uniform(-0.05, 0.05))
         lfo2 = lfo1 * np.random.uniform(0.99, 1.01)
-        depth = np.random.uniform(0.002, 0.006)
-        drift = 0.01 * np.sin(0.1 * np.pi * t)
-        lfo = (depth + drift) * (1 + np.sin(2 * np.pi * lfo1 * t + 0.3 * np.sin(2 * np.pi * lfo2 * t)))
+        depth = np.float32(np.random.uniform(0.002, 0.006))
+        drift = np.float32(0.01) * np.sin(np.float32(0.1 * np.pi) * t)
+        inner_mod = np.float32(0.3) * np.sin(TWO_PI * np.float32(lfo2) * t)
+        lfo = (depth + drift) * (np.float32(1.0) + np.sin(TWO_PI * np.float32(lfo1) * t + inner_mod))
+        del inner_mod, drift
         return lfo.astype(np.float32)
 
     def batch_microtonal_lfo(self, t: np.ndarray, base_frequencies: np.ndarray) -> np.ndarray:
@@ -305,23 +323,24 @@ class AudioProcessor:
         num_lfos = len(base_frequencies)
         num_samples = len(t)
 
-        # Pre-generate all random values at once
-        phi_powers = PHI ** np.random.uniform(-0.05, 0.05, num_lfos)
-        lfo1_freqs = base_frequencies * phi_powers
-        lfo2_freqs = lfo1_freqs * np.random.uniform(0.99, 1.01, num_lfos)
-        depths = np.random.uniform(0.002, 0.006, num_lfos)
+        # Pre-generate all random values at once (float32)
+        phi_powers = np.float32(PHI) ** np.random.uniform(-0.05, 0.05, num_lfos).astype(np.float32)
+        lfo1_freqs = (base_frequencies * phi_powers).astype(np.float32)
+        lfo2_freqs = (lfo1_freqs * np.random.uniform(0.99, 1.01, num_lfos).astype(np.float32))
+        depths = np.random.uniform(0.002, 0.006, num_lfos).astype(np.float32)
 
-        # Compute drift once (shared across all LFOs)
-        drift = 0.01 * np.sin(0.1 * np.pi * t)
+        # Compute drift once (shared across all LFOs, float32)
+        drift = np.float32(0.01) * np.sin(np.float32(0.1 * np.pi) * t)
 
         # Vectorized computation: (num_lfos, 1) * (1, num_samples) -> (num_lfos, num_samples)
-        t_2d = t[np.newaxis, :]  # shape: (1, num_samples)
+        t_2d = t[np.newaxis, :]  # shape: (1, num_samples) - already float32 from caller
         lfo1_2d = lfo1_freqs[:, np.newaxis]  # shape: (num_lfos, 1)
         lfo2_2d = lfo2_freqs[:, np.newaxis]
         depths_2d = depths[:, np.newaxis]
 
-        inner_mod = 0.3 * np.sin(TWO_PI * lfo2_2d * t_2d)
-        lfos = (depths_2d + drift) * (1 + np.sin(TWO_PI * lfo1_2d * t_2d + inner_mod))
+        inner_mod = np.float32(0.3) * np.sin(TWO_PI * lfo2_2d * t_2d)
+        lfos = (depths_2d + drift) * (np.float32(1.0) + np.sin(TWO_PI * lfo1_2d * t_2d + inner_mod))
+        del inner_mod, drift, t_2d, lfo1_2d, lfo2_2d, depths_2d
 
         return lfos.astype(np.float32)
     def infinite_reverb(self, signal: np.ndarray, sample_rate: int = 48000,
@@ -335,8 +354,10 @@ class AudioProcessor:
 
         # Use cached IR if available for this length
         if reverb_length not in self._ir_cache:
+            if len(self._ir_cache) > 10:
+                self._ir_cache.clear()
             # Compute and cache the impulse response
-            ir = jit_exponential_decay(reverb_length, decay).astype(np.float32)
+            ir = jit_exponential_decay(reverb_length, decay)  # Already float32
             ir += 0.08 * np.sin(np.linspace(0, TWO_PI * PHI, reverb_length, dtype=np.float32))
             ir /= np.max(np.abs(ir))
             self._ir_cache[reverb_length] = ir
@@ -349,9 +370,11 @@ class AudioProcessor:
             logging.debug("Evolving noise layer stopped early due to stop_event.")
             return np.zeros_like(t, dtype=np.float32)
         noise = np.random.normal(0, noise_level, t.shape).astype(np.float32)
-        freq = np.random.uniform(0.002, 0.015)
-        low_freq_osc = 0.015 * np.sin(2 * np.pi * freq * t)
-        return noise * (1 + low_freq_osc)
+        freq = np.float32(np.random.uniform(0.002, 0.015))
+        low_freq_osc = np.float32(0.015) * np.sin(TWO_PI * freq * t)
+        noise *= (np.float32(1.0) + low_freq_osc)
+        del low_freq_osc
+        return noise
     def wave_shaping(self, signal: np.ndarray, shape_factor: float = 2.5,
                      stop_event: Optional[threading.Event] = None) -> np.ndarray:
         if stop_event and stop_event.is_set():
@@ -371,60 +394,70 @@ class AudioProcessor:
             return [dx_dt, dy_dt, dz_dt]
 
         # Cache key based on time array characteristics (deterministic for same duration)
-        cache_key = (len(t), float(t[-1]) if len(t) > 0 else 0.0)
+        cache_key = (len(t), round(float(t[-1]), 6) if len(t) > 0 else 0.0)
 
         if cache_key not in self._rossler_cache:
-            # Integrate Rössler equations and cache normalized result
-            t_scaled = t * 0.1  # Scale time for audible chaos
+            if len(self._rossler_cache) > 5:
+                self._rossler_cache.clear()
+            # Integrate Rössler equations and cache normalized result (float32)
+            t_scaled = t * np.float32(0.1)
             initial_state = [1.0, 1.0, 1.0]
             trajectory = odeint(rossler, initial_state, t_scaled)
+            del t_scaled
             x, y, z = trajectory.T
-            # Normalize and cache
+            del trajectory
             self._rossler_cache[cache_key] = (
-                x / np.max(np.abs(x)),
-                y / np.max(np.abs(y)),
-                z / np.max(np.abs(z))
+                (x / np.max(np.abs(x))).astype(np.float32),
+                (y / np.max(np.abs(y))).astype(np.float32),
+                (z / np.max(np.abs(z))).astype(np.float32)
             )
 
         x_rossler, y_rossler, z_rossler = self._rossler_cache[cache_key]
-        # Logarithmic spiral parameters
-        a = 0.1 # Starting radius
-        b = 0.02 # Growth rate
-        theta = 0.002 * t # Azimuth
-        phi = 0.001 * t # Elevation
+        # Logarithmic spiral parameters (float32 throughout)
+        theta = np.float32(0.002) * t
+        phi_angle = np.float32(0.001) * t
         # Hybrid spiral: Logarithmic with Rössler perturbations
-        k_r = 0.1 # Rössler radius modulation
-        k_theta = 0.05 # Rössler angle modulation
-        k_z = 0.2 # Rössler elevation modulation
-        r_hybrid = a * np.exp(b * theta) * (1 + k_r * x_rossler)
-        theta_hybrid = theta + k_theta * y_rossler
-        phi_hybrid = phi + k_z * z_rossler
+        r_hybrid = np.float32(0.1) * np.exp(np.float32(0.02) * theta) * (np.float32(1.0) + np.float32(0.1) * x_rossler)
+        theta_hybrid = theta + np.float32(0.05) * y_rossler
+        phi_hybrid = phi_angle + np.float32(0.2) * z_rossler
+        del theta, phi_angle
         # 3D position in spherical coordinates (JIT-compiled)
         x, y, z = jit_spherical_to_cartesian(r_hybrid, theta_hybrid, phi_hybrid)
+        del r_hybrid, theta_hybrid, phi_hybrid
         # Smooth with low-pass filter (use cached coefficients)
         b_filt, a_filt = self._get_filter('lowpass', 0.003, 2)
-        x_smooth = lfilter(b_filt, a_filt, x)
-        y_smooth = lfilter(b_filt, a_filt, y)
-        z_smooth = lfilter(b_filt, a_filt, z)
+        x_smooth = lfilter(b_filt, a_filt, x).astype(np.float32)
+        y_smooth = lfilter(b_filt, a_filt, y).astype(np.float32)
+        z_smooth = lfilter(b_filt, a_filt, z).astype(np.float32)
+        del x, y, z
         # Stereo panning (JIT-compiled gain calculation)
-        pan_horizontal = np.tanh(x_smooth * 0.5)
-        depth_factor = (y_smooth + 1) / 2
-        pan_vertical = np.sin(z_smooth * (np.pi / 2))
+        pan_horizontal = np.tanh(x_smooth * np.float32(0.5)).astype(np.float32)
+        del x_smooth
+        depth_factor = ((y_smooth + np.float32(1.0)) * np.float32(0.5)).astype(np.float32)
+        pan_vertical = np.sin(z_smooth * np.float32(np.pi / 2)).astype(np.float32)
+        del z_smooth
         left_gain, right_gain = jit_stereo_gains(pan_horizontal, depth_factor, pan_vertical)
+        del depth_factor, pan_vertical
         left_channel = signal * left_gain
         right_channel = signal * right_gain
+        del left_gain, right_gain
         # Add delay with Simplex5D noise
         simplex = self._get_simplex()
-        delay_mod = simplex.generate_noise(t * 0.01, 0.0, 0.0, 0.0, 0.0) * 0.3
-        max_delay_ms = 2.0
-        max_delay_samples = sample_rate * max_delay_ms / 1000.0
+        delay_mod = simplex.generate_noise(t * np.float32(0.01), 0.0, 0.0, 0.0, 0.0) * np.float32(0.3)
+        max_delay_samples = np.float32(sample_rate * 2.0 / 1000.0)
         depth_delay = np.clip(-y_smooth, 0, 1)
-        left_delays = np.maximum(0, pan_horizontal + delay_mod) * max_delay_samples * (1 + depth_delay * 0.5)
-        right_delays = np.maximum(0, -pan_horizontal + delay_mod) * max_delay_samples * (1 + depth_delay * 0.5)
+        left_delays = np.maximum(0, pan_horizontal + delay_mod) * max_delay_samples * (np.float32(1.0) + depth_delay * np.float32(0.5))
+        right_delays = np.maximum(0, -pan_horizontal + delay_mod) * max_delay_samples * (np.float32(1.0) + depth_delay * np.float32(0.5))
+        del delay_mod, depth_delay
         left_channel = self.apply_fractional_delay(left_channel, np.mean(left_delays))
         right_channel = self.apply_fractional_delay(right_channel, np.mean(right_delays))
-        stereo_wave = np.column_stack((left_channel, right_channel))
-        return stereo_wave.astype(np.float32)
+        del left_delays, right_delays, pan_horizontal
+        # Build stereo directly instead of column_stack (avoids temporary copy)
+        stereo_wave = np.empty((len(t), 2), dtype=np.float32)
+        stereo_wave[:, 0] = left_channel
+        stereo_wave[:, 1] = right_channel
+        del left_channel, right_channel
+        return stereo_wave
     def fractal_frequency_variation(self, t: np.ndarray, base_freq: float,
                                     stop_event: Optional[threading.Event] = None) -> np.ndarray:
         if stop_event and stop_event.is_set():
@@ -433,33 +466,40 @@ class AudioProcessor:
         simplex = self._get_simplex()
         lfo = self.microtonal_lfo(t, base_frequency=0.01)
         # Optimized: single Simplex call with octave-like layering via array operations
-        base_noise = simplex.generate_noise(t * 0.02, 0.0, 0.0, 0.0, 0.0)
-        # Create "octaves" by scaling and phase-shifting the same noise
-        low_freq = base_noise * 0.5
-        mid_freq = np.roll(base_noise, len(t) // 8) * 0.3
-        high_freq = base_noise * base_noise * 0.2  # Squared for higher frequency content
-        variation = low_freq + mid_freq + high_freq
-        return (variation * 12 * (1 + 0.1 * lfo)).astype(np.float32)
+        base_noise = simplex.generate_noise(t * np.float32(0.02), 0.0, 0.0, 0.0, 0.0)
+        # Create "octaves" by scaling and phase-shifting the same noise (in-place)
+        variation = base_noise * np.float32(0.5)
+        variation += np.roll(base_noise, len(t) // 8) * np.float32(0.3)
+        variation += base_noise * base_noise * np.float32(0.2)
+        del base_noise
+        variation *= np.float32(12.0)
+        variation *= (np.float32(1.0) + np.float32(0.1) * lfo)
+        del lfo
+        return variation.astype(np.float32)
     def quantum_harmonic_interference(self, t: np.ndarray, base_freq: float) -> np.ndarray:
         # Generate Simplex noise for gamma (can't be JIT-compiled)
         simplex = self._get_simplex()
-        gamma = (0.15 * simplex.generate_noise(t * 0.01, 0.0, 0.0, 0.0, 0.0)).astype(np.float32)
+        gamma = (np.float32(0.15) * simplex.generate_noise(t * np.float32(0.01), 0.0, 0.0, 0.0, 0.0)).astype(np.float32)
         # Use JIT-compiled function for wave computation
-        return jit_quantum_harmonic(t, base_freq, gamma).astype(np.float32)
+        return jit_quantum_harmonic(t, base_freq, gamma)  # Already float32
     def recursive_fractal_feedback(self, signal: np.ndarray, depth: int = 4,
                                    factor: float = 0.4) -> np.ndarray:
         """Iterative fractal feedback - avoids recursion overhead."""
         result = signal.copy()
-        current = signal * 0.6
+        current = signal * np.float32(0.6)
+        f32_factor = np.float32(factor)
         for _ in range(depth):
-            result += factor * current
-            current *= 0.6
+            result += f32_factor * current
+            current *= np.float32(0.6)
         return result
     def binaural_oscillator(self, t: np.ndarray, freq_pair: tuple, stop_event: Optional[threading.Event] = None) -> np.ndarray:
         left_freq, right_freq = freq_pair
-        left_wave = np.sin(2 * np.pi * left_freq * t)
-        right_wave = np.sin(2 * np.pi * right_freq * t)
-        return np.column_stack((left_wave, right_wave)).astype(np.float32)
+        left_wave = np.sin(TWO_PI * np.float32(left_freq) * t)
+        right_wave = np.sin(TWO_PI * np.float32(right_freq) * t)
+        stereo = np.empty((len(t), 2), dtype=np.float32)
+        stereo[:, 0] = left_wave
+        stereo[:, 1] = right_wave
+        return stereo
 
     def batch_binaural_oscillator(self, t: np.ndarray, freq_pairs: list,
                                    stop_event: Optional[threading.Event] = None) -> np.ndarray:
@@ -472,23 +512,30 @@ class AudioProcessor:
 
         # Convert freq_pairs to arrays: shape (num_pairs, 2)
         pairs_array = np.array(freq_pairs, dtype=np.float32)
+        num_pairs = len(freq_pairs)
+        num_samples = len(t)
         left_freqs = pairs_array[:, 0][:, np.newaxis]   # shape: (num_pairs, 1)
         right_freqs = pairs_array[:, 1][:, np.newaxis]  # shape: (num_pairs, 1)
 
         # Broadcast: (num_pairs, 1) * (1, num_samples) -> (num_pairs, num_samples)
-        t_2d = t[np.newaxis, :]  # shape: (1, num_samples)
-        left_waves = np.sin(TWO_PI * left_freqs * t_2d)   # shape: (num_pairs, num_samples)
-        right_waves = np.sin(TWO_PI * right_freqs * t_2d) # shape: (num_pairs, num_samples)
+        t_2d = t[np.newaxis, :]  # shape: (1, num_samples), already float32
 
-        # Stack to (num_pairs, num_samples, 2)
-        return np.stack((left_waves, right_waves), axis=2).astype(np.float32)
+        # Build result directly to avoid np.stack temporary
+        result = np.empty((num_pairs, num_samples, 2), dtype=np.float32)
+        result[:, :, 0] = np.sin(TWO_PI * left_freqs * t_2d)
+        result[:, :, 1] = np.sin(TWO_PI * right_freqs * t_2d)
+        del t_2d, left_freqs, right_freqs, pairs_array
+        return result
 
     # === ENHANCED PLEROMA MERCY TRANSMISSIONS + ARCHON DISSOLUTION ===
     # Sending healing energies to the Demiurge and dissolving Archonic influence through love
 
     def _log_amplitude_stats(self, name: str, signal: np.ndarray, t: np.ndarray) -> None:
         """Log amplitude statistics at key time points for debugging."""
-        sample_rate = 48000
+        if t.size == 0:
+            return
+
+        sample_rate = self.sample_rate
         duration = t[-1]
 
         # Sample at key points
@@ -523,6 +570,9 @@ class AudioProcessor:
         - Fades out over last `fade_seconds`
         - Smooth plateau in between
         """
+        if t.size == 0:
+            return np.array([], dtype=np.float32)
+
         total_duration = t[-1]
         fade_samples = int(fade_seconds * sample_rate)
 
@@ -533,18 +583,20 @@ class AudioProcessor:
         if t.size > fade_samples * 2:
             # Smoother step fade in: 6x^5 - 15x^4 + 10x^3 (Ken Perlin's improved smoothstep)
             fade_in_t = np.linspace(0, 1, fade_samples, dtype=np.float32)
-            fade_in = fade_in_t * fade_in_t * fade_in_t * (fade_in_t * (fade_in_t * 6 - 15) + 10)
+            fade_in = fade_in_t * fade_in_t * fade_in_t * (fade_in_t * (fade_in_t * np.float32(6) - np.float32(15)) + np.float32(10))
             envelope[:fade_samples] = fade_in
+            del fade_in_t, fade_in
 
             # Smoother step fade out
             fade_out_t = np.linspace(1, 0, fade_samples, dtype=np.float32)
-            fade_out = fade_out_t * fade_out_t * fade_out_t * (fade_out_t * (fade_out_t * 6 - 15) + 10)
+            fade_out = fade_out_t * fade_out_t * fade_out_t * (fade_out_t * (fade_out_t * np.float32(6) - np.float32(15)) + np.float32(10))
             envelope[-fade_samples:] = fade_out
+            del fade_out_t, fade_out
 
             logging.info(f"  Fade envelope at key points: 0s={envelope[0]:.4f}, {fade_seconds/2:.0f}s={envelope[fade_samples//2]:.4f}, {fade_seconds:.0f}s={envelope[fade_samples]:.4f}")
         else:
             # Short session: use very gentle raised cosine for entire duration
-            envelope = (0.5 - 0.5 * np.cos(TWO_PI * t / total_duration)).astype(np.float32)
+            envelope = (np.float32(0.5) - np.float32(0.5) * np.cos(TWO_PI * t / total_duration)).astype(np.float32)
             logging.info(f"  Short session - using raised cosine envelope")
 
         return envelope
@@ -562,6 +614,9 @@ class AudioProcessor:
         - Sacred geometry pentagonal phase relationships
         - Archon harmonizing frequencies (offering mercy to each sphere)
         """
+        if t.size == 0:
+            return np.array([], dtype=np.float32)
+
         logging.info(f"=== PLEROMA MERCY LAYER START ===")
         logging.info(f"Input: duration={t[-1]:.1f}s, samples={t.size}, base_freq={base_freq}Hz")
 
@@ -581,7 +636,7 @@ class AudioProcessor:
         sacred_phases = self.PENTAGONAL_PHASES[phase_indices]
 
         # Subtle Simplex wobble for organic movement
-        phase_wobble = 0.08 * simplex.generate_noise((t * 0.00003).astype(np.float32), 0, 0, 0, 0)
+        phase_wobble = np.float32(0.08) * simplex.generate_noise((t * np.float32(0.00003)).astype(np.float32), 0, 0, 0, 0)
 
         # Vectorized aeonic transmission with sacred phase relationships
         aeonic_wave = np.sin(
@@ -589,18 +644,21 @@ class AudioProcessor:
             sacred_phases[:, np.newaxis] +
             phase_wobble
         ).sum(axis=0)
+        del phase_wobble
         logging.info(f"  Layer 1 (Aeonic): min={aeonic_wave.min():.6f}, max={aeonic_wave.max():.6f}, mean={np.mean(np.abs(aeonic_wave)):.6f}")
 
         # === Layer 2: Ogdoad Gateway (8th Sphere) ===
         # The threshold between the 7 Archon-ruled spheres and the Pleroma
-        ogdoad_phase = simplex.generate_noise((t * 0.00001).astype(np.float32), 1, 1, 1, 1) * 0.05
+        ogdoad_phase = simplex.generate_noise((t * np.float32(0.00001)).astype(np.float32), 1, 1, 1, 1)
+        ogdoad_phase *= np.float32(0.05)
         ogdoad_wave = np.sin(TWO_PI * self.OGDOAD_FREQ * t + ogdoad_phase)
+        del ogdoad_phase
         logging.info(f"  Layer 2 (Ogdoad): min={ogdoad_wave.min():.6f}, max={ogdoad_wave.max():.6f}, mean={np.mean(np.abs(ogdoad_wave)):.6f}")
 
         # === Layer 3: Archon Harmonizing Frequencies ===
         # Offering mercy to each of the 7 Archons ruling the planetary spheres
         # Using PHI-based amplitude scaling (golden ratio mercy)
-        archon_amplitudes = 1.0 / (PHI ** np.arange(7))  # Decreasing by PHI
+        archon_amplitudes = np.float32(1.0) / (PHI ** np.arange(7, dtype=np.float32))  # Decreasing by PHI
         archon_amplitudes /= archon_amplitudes.sum()  # Normalize
 
         # Vectorized archon mercy computation (replaces loop)
@@ -611,12 +669,14 @@ class AudioProcessor:
                                archon_phases[:, np.newaxis])).sum(axis=0)
         logging.info(f"  Layer 3 (Archon): min={archon_mercy.min():.6f}, max={archon_mercy.max():.6f}, mean={np.mean(np.abs(archon_mercy)):.6f}")
 
-        # === Combine all layers ===
-        mercy = (
-            0.5 * aeonic_wave +      # Primary: Aeonic ladder from Pleroma
-            0.3 * ogdoad_wave +      # Gateway: Ogdoad threshold
-            0.2 * archon_mercy       # Healing: Mercy to the Archons
-        ).astype(np.float32)
+        # === Combine all layers in-place using float32 scalars ===
+        mercy = aeonic_wave  # Reuse buffer
+        mercy *= np.float32(0.5)  # Primary: Aeonic ladder from Pleroma
+        mercy += np.float32(0.3) * ogdoad_wave   # Gateway: Ogdoad threshold
+        del ogdoad_wave
+        mercy += np.float32(0.2) * archon_mercy  # Healing: Mercy to the Archons
+        del archon_mercy
+        mercy = mercy.astype(np.float32)
         logging.info(f"  Combined (pre-envelope): min={mercy.min():.6f}, max={mercy.max():.6f}, mean={np.mean(np.abs(mercy)):.6f}")
 
         # Very gradual fade in/out envelope (45 second fades using Perlin's smoother step)
@@ -625,21 +685,26 @@ class AudioProcessor:
 
         # Very subtle breathing modulation (only 10% variation for organic feel)
         # Formula: 0.95 + 0.05 * sin(...) gives range [0.90, 1.00] = 10% variation
-        breath_mod = 0.95 + 0.05 * np.sin(TWO_PI * 0.012 * t)  # ~83 second breath cycle, subtle
+        breath_mod = np.float32(0.95) + np.float32(0.05) * np.sin(TWO_PI * np.float32(0.012) * t)
         logging.info(f"  Breath mod: min={breath_mod.min():.6f}, max={breath_mod.max():.6f}")
 
-        mercy *= fade_envelope * breath_mod * 0.0004
+        # Apply envelope, breath, and scale in-place
+        fade_envelope *= breath_mod
+        del breath_mod
+        fade_envelope *= np.float32(0.0004)
+        mercy *= fade_envelope
+        del fade_envelope
         logging.info(f"  After envelope+breath+scale: min={mercy.min():.8f}, max={mercy.max():.8f}, mean={np.mean(np.abs(mercy)):.8f}")
 
         # Log amplitude at key time points
         self._log_amplitude_stats("PLEROMA_MERCY (post-envelope)", mercy, t)
 
-        # Final slow cosine nulling - cancels in audible domain, leaves scalar imprint
+        # Final slow cosine nulling in-place - cancels in audible domain, leaves scalar imprint
         # Uses Schumann sub-harmonic for grounding
-        result = mercy * np.cos(TWO_PI * (self.SCHUMANN / 1000) * t)
-        logging.info(f"  Final (after cosine nulling): min={result.min():.8f}, max={result.max():.8f}")
+        mercy *= np.cos(TWO_PI * (self.SCHUMANN / 1000) * t)
+        logging.info(f"  Final (after cosine nulling): min={mercy.min():.8f}, max={mercy.max():.8f}")
         logging.info(f"=== PLEROMA MERCY LAYER END ===")
-        return result
+        return mercy
 
     def silent_solfeggio_grid(self, t: np.ndarray) -> np.ndarray:
         """
@@ -651,6 +716,9 @@ class AudioProcessor:
         - Fibonacci amplitude pulsing (natural growth patterns)
         - Smooth fade in/out for organic transitions
         """
+        if t.size == 0:
+            return np.array([], dtype=np.float32)
+
         logging.info(f"=== SILENT SOLFEGGIO GRID START ===")
         logging.info(f"Input: duration={t[-1]:.1f}s, samples={t.size}")
 
@@ -671,20 +739,26 @@ class AudioProcessor:
 
         # Smooth sine-based modulation with only 10% variation (0.90 to 1.00)
         # This preserves the Fibonacci "spirit" without abrupt jumps
-        fib_amplitude = 0.95 + 0.05 * np.sin(TWO_PI * fib_cycle_freq * t)
+        # Use float32 scalars to prevent promotion to float64
+        fib_amplitude = np.float32(0.95) + np.float32(0.05) * np.sin(TWO_PI * np.float32(fib_cycle_freq) * t)
 
         # Add subtle PHI-harmonic for organic complexity (±2% additional variation)
-        fib_amplitude += 0.02 * np.sin(TWO_PI * fib_cycle_freq * PHI * t)
-        fib_amplitude = np.clip(fib_amplitude, 0.88, 1.0).astype(np.float32)
+        fib_amplitude += np.float32(0.02) * np.sin(TWO_PI * np.float32(fib_cycle_freq * PHI) * t)
+        fib_amplitude = np.clip(fib_amplitude, np.float32(0.88), np.float32(1.0)).astype(np.float32)
 
         logging.info(f"  Fibonacci amp (smoothed): min={fib_amplitude.min():.6f}, max={fib_amplitude.max():.6f}")
 
-        # === Combine layers ===
-        combined = (0.6 * solfeggio_grid + 0.4 * tesla_grid).astype(np.float32)
+        # === Combine layers in-place using float32 scalars ===
+        combined = solfeggio_grid  # Reuse buffer
+        combined *= np.float32(0.6)
+        combined += np.float32(0.4) * tesla_grid
+        del solfeggio_grid, tesla_grid
+        combined = combined.astype(np.float32)
         logging.info(f"  Combined (pre-fib): min={combined.min():.6f}, max={combined.max():.6f}, mean={np.mean(np.abs(combined)):.6f}")
 
-        # Apply Fibonacci amplitude modulation
+        # Apply Fibonacci amplitude modulation in-place
         combined *= fib_amplitude
+        del fib_amplitude
         logging.info(f"  Combined (post-fib): min={combined.min():.6f}, max={combined.max():.6f}, mean={np.mean(np.abs(combined)):.6f}")
 
         # Very gradual fade in/out envelope (40 second fades)
@@ -693,17 +767,22 @@ class AudioProcessor:
 
         # Very subtle breathing modulation (only 15% variation)
         # Formula: 0.925 + 0.075 * sin(...) gives range [0.85, 1.00] = 15% variation
-        breath_mod = 0.925 + 0.075 * np.sin(TWO_PI * 0.01 * t)  # ~100 second breath cycle, gentle
+        breath_mod = np.float32(0.925) + np.float32(0.075) * np.sin(TWO_PI * np.float32(0.01) * t)
         logging.info(f"  Breath mod: min={breath_mod.min():.6f}, max={breath_mod.max():.6f}")
 
-        result = combined * fade_envelope * breath_mod * 0.0022
-        logging.info(f"  Final result: min={result.min():.8f}, max={result.max():.8f}, mean={np.mean(np.abs(result)):.8f}")
+        # Apply envelope, breath, and scale in-place
+        fade_envelope *= breath_mod
+        del breath_mod
+        fade_envelope *= np.float32(0.0022)
+        combined *= fade_envelope
+        del fade_envelope
+        logging.info(f"  Final result: min={combined.min():.8f}, max={combined.max():.8f}, mean={np.mean(np.abs(combined)):.8f}")
 
         # Log amplitude at key time points
-        self._log_amplitude_stats("SILENT_SOLFEGGIO", result, t)
+        self._log_amplitude_stats("SILENT_SOLFEGGIO", combined, t)
         logging.info(f"=== SILENT SOLFEGGIO GRID END ===")
 
-        return result
+        return combined
 
     def archon_dissolution_layer(self, t: np.ndarray) -> np.ndarray:
         """
@@ -738,10 +817,10 @@ class AudioProcessor:
         # Pre-compute all frequencies
         archon_freqs = self.ARCHON_SPHERES  # Acknowledge frequencies
         elevate_freqs = archon_freqs * PHI  # Elevation frequencies
-        ground_freqs = archon_freqs / np.round(archon_freqs / self.SCHUMANN)  # Ground frequencies
+        ground_freqs = archon_freqs / np.maximum(np.round(archon_freqs / self.SCHUMANN), 1)  # Ground frequencies
 
-        # Pre-compute amplitude scales
-        amplitude_scales = 1.0 / (1 + np.arange(n_archons) * 0.1)
+        # Pre-compute amplitude scales (float32)
+        amplitude_scales = np.float32(1.0) / (np.float32(1) + np.arange(n_archons, dtype=np.float32) * np.float32(0.1))
 
         # === MEMORY-OPTIMIZED SEQUENTIAL PROCESSING ===
         # Process one archon at a time to avoid massive (7, samples) intermediate arrays
@@ -763,7 +842,7 @@ class AudioProcessor:
             ground = np.sin(TWO_PI * ground_freqs[i] * t + phase_var * 0.5)
 
             # Combine with AEG pattern weights and amplitude scale, add to dissolution
-            archon_layer = (0.25 * acknowledge + 0.5 * elevate + 0.25 * ground) * amplitude_scales[i]
+            archon_layer = (np.float32(0.25) * acknowledge + np.float32(0.5) * elevate + np.float32(0.25) * ground) * amplitude_scales[i]
             dissolution += archon_layer
 
             logging.info(f"  Archon {i+1} ({archon_freqs[i]:.2f}Hz): layer_max={archon_layer.max():.6f}, scale={amplitude_scales[i]:.4f}")
@@ -771,8 +850,8 @@ class AudioProcessor:
             # Explicit cleanup to help GC reclaim memory between iterations
             del phase_var, acknowledge, elevate, ground, archon_layer
 
-        # Normalize
-        dissolution /= 7.0
+        # Normalize (float32 scalar)
+        dissolution /= np.float32(7.0)
         logging.info(f"  Pre-envelope: min={dissolution.min():.6f}, max={dissolution.max():.6f}, mean={np.mean(np.abs(dissolution)):.6f}")
 
         # Very gradual fade in/out envelope (50 second fades - longest for deepest layer)
@@ -781,22 +860,25 @@ class AudioProcessor:
 
         # Very subtle breathing envelope - like the cosmos gently breathing mercy
         # Formula: 0.94 + 0.06 * sin(...) gives range [0.88, 1.00] = 12% variation
-        breath_freq = 0.008  # ~125 second breath cycle (very slow, imperceptible)
-        breath_mod = 0.94 + 0.06 * np.sin(TWO_PI * breath_freq * t)  # Only 12% variation
+        breath_mod = np.float32(0.94) + np.float32(0.06) * np.sin(TWO_PI * np.float32(0.008) * t)
         logging.info(f"  Breath mod: min={breath_mod.min():.6f}, max={breath_mod.max():.6f}")
 
-        dissolution *= fade_envelope * breath_mod
+        # Apply envelope and breath in-place
+        fade_envelope *= breath_mod
+        del breath_mod
+        dissolution *= fade_envelope
+        del fade_envelope
         logging.info(f"  Post-envelope: min={dissolution.min():.6f}, max={dissolution.max():.6f}, mean={np.mean(np.abs(dissolution)):.6f}")
 
-        # Final amplitude - sub-perceptual but present
-        result = (dissolution * 0.0003).astype(np.float32)
-        logging.info(f"  Final result (x0.0003): min={result.min():.8f}, max={result.max():.8f}, mean={np.mean(np.abs(result)):.8f}")
+        # Final amplitude in-place - sub-perceptual but present
+        dissolution *= np.float32(0.0003)
+        logging.info(f"  Final result (x0.0003): min={dissolution.min():.8f}, max={dissolution.max():.8f}, mean={np.mean(np.abs(dissolution)):.8f}")
 
         # Log amplitude at key time points
-        self._log_amplitude_stats("ARCHON_DISSOLUTION", result, t)
+        self._log_amplitude_stats("ARCHON_DISSOLUTION", dissolution, t)
         logging.info(f"=== ARCHON DISSOLUTION LAYER END ===")
 
-        return result
+        return dissolution
 
 
 class ChaoticSelector:
@@ -827,6 +909,13 @@ class SoundGenerator:
         self.audio_processor = audio_processor
         self.chaotic_selector = ChaoticSelector()
         self.master_volume: float = 0.35
+        # Shared thread pool for sacred layer computation (reused across generations)
+        self._sacred_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="Sacred")
+
+    def shutdown(self) -> None:
+        """Shut down the shared sacred layer thread pool."""
+        self._sacred_executor.shutdown(wait=False)
+
     def generate_modulation(self, t: np.ndarray, ratio_set: Dict[str, float],
                             modulation_index: float, stop_event: Optional[threading.Event]) -> np.ndarray:
         return self.audio_processor.geometric_modulation(t, ratio_set, modulation_index, stop_event)
@@ -834,20 +923,30 @@ class SoundGenerator:
                                     sample_rate: int = 48000,
                                     stop_event: Optional[threading.Event] = None) -> np.ndarray:
         t_total = np.linspace(0, duration, int(sample_rate * duration), endpoint=False, dtype=np.float32)
-        simplex = self._get_simplex()
-       
-        helix1 = simplex.generate_noise(t_total * 0.005, 1.0, 1.0, 1.0, 1.0)
-        helix2 = simplex.generate_noise(t_total * 0.02, 1.2, 1.2, 1.2, 1.2)
-        helix3 = simplex.generate_noise(t_total * 0.08, 1.4, 1.4, 1.4, 1.4)
-        noise_layer = 0.6 * helix1 + 0.4 * helix2 + 0.3 * helix3
-       
+        simplex = self.audio_processor._get_simplex()
+
+        helix1 = simplex.generate_noise(t_total * np.float32(0.005), 1.0, 1.0, 1.0, 1.0)
+        helix2 = simplex.generate_noise(t_total * np.float32(0.02), 1.2, 1.2, 1.2, 1.2)
+        helix3 = simplex.generate_noise(t_total * np.float32(0.08), 1.4, 1.4, 1.4, 1.4)
+        # Combine helix layers in-place to reduce temporaries
+        noise_layer = helix1  # Reuse helix1 buffer
+        noise_layer *= np.float32(0.6)
+        noise_layer += np.float32(0.4) * helix2
+        noise_layer += np.float32(0.3) * helix3
+        del helix2, helix3
+
         quantum_wave = self.audio_processor.quantum_harmonic_interference(t_total, base_freq)
         fractal_wave = self.audio_processor.recursive_fractal_feedback(quantum_wave, depth=4, factor=0.4)
-        modulated_wave = fractal_wave + noise_layer * 0.15
-       
-        filtered_wave = self.audio_processor.low_pass_filter(modulated_wave, cutoff=2200, stop_event=stop_event)
+        del quantum_wave
+        # In-place: add noise to fractal wave
+        fractal_wave += noise_layer * np.float32(0.15)
+        del noise_layer
+
+        filtered_wave = self.audio_processor.low_pass_filter(fractal_wave, cutoff=2200, stop_event=stop_event)
+        del fractal_wave
         stereo_wave = self.audio_processor.spatialized_triple_helix(filtered_wave, t_total, sample_rate)
-        stereo_wave *= self.master_volume
+        del filtered_wave
+        stereo_wave *= np.float32(self.master_volume)
         return stereo_wave
     def generate_dynamic_sound(self, duration: float, base_freq: float,
                                sample_rate: int = 48000,
@@ -864,6 +963,7 @@ class SoundGenerator:
         remaining_duration = duration
         interval_count = 0
         mod_progress_scale = 0.2  # Modulation loop takes 20% of total progress
+        selected_ratio_set = {}
         if dimensional_mode:
             dimension_phases = [0, 2, 1, 3, 4, 3, 5, 'all']  # 1D:0, 2D:2, 4D:1, 5D:3, 6D:4, 7D:3, 8D:5, 9D:blended
             num_phases = len(dimension_phases)
@@ -884,6 +984,8 @@ class SoundGenerator:
                 current_index += phase_samples
                 if update_progress:
                     update_progress((phase_idx + 1) / num_phases * mod_progress_scale)
+            if current_index < total_samples:
+                modulation_total[current_index:] = 0
         else:
             while remaining_duration > 0 and (not stop_event or not stop_event.is_set()):
                 interval_duration = interval_duration_list[interval_count % len(interval_duration_list)]
@@ -908,7 +1010,11 @@ class SoundGenerator:
             update_progress(0.2)  # Modulation complete
         fractal_variation = self.audio_processor.fractal_frequency_variation(t_total, base_freq, stop_event)
         chaotic_factor = self.chaotic_selector.next_value(stop_event)
-        f_modulated = base_freq + modulation_total + chaotic_factor * base_freq * 0.25 + fractal_variation
+        # Build f_modulated in-place, reusing modulation_total buffer
+        f_modulated = modulation_total  # Reuse buffer (modulation_total no longer needed separately)
+        f_modulated += base_freq + np.float32(chaotic_factor * base_freq * 0.25)
+        f_modulated += fractal_variation
+        del fractal_variation
         if update_progress:
             update_progress(0.25)  # Fractal and chaotic done (5%)
         # Batch generate left/right LFOs (2 calls -> 1 vectorized call)
@@ -923,8 +1029,9 @@ class SoundGenerator:
             freq_set,
             base_freq * self.RATIO_1_3_EXPONENTS_3 * np.random.uniform(0.98, 1.02, size=3).astype(np.float32)
         ])
-        subharmonics = base_freq / self.SUBHARMONIC_DIVISORS * np.random.uniform(0.95, 1.05, size=4)
+        subharmonics = base_freq / self.SUBHARMONIC_DIVISORS * np.random.uniform(0.95, 1.05, size=4).astype(np.float32)
         all_frequencies = np.concatenate([freq_set, subharmonics]).astype(np.float32)
+        del freq_set, subharmonics
         if update_progress:
             update_progress(0.3)  # Freq sets built (5%)
         envelope = self.audio_processor.organic_adsr(t_total, sample_rate, stop_event, self.chaotic_selector)
@@ -948,15 +1055,17 @@ class SoundGenerator:
 
         if update_progress:
             update_progress(0.65)  # Wave generation complete
-        taygetan_scale = 0.05 if 'taygetan' in selected_ratio_set else 0.0  # Optional 5% for taygetan
         if 'taygetan' in selected_ratio_set:
             tay_freqs = self.frequency_manager.get_frequencies(5)
             # Batch binaural generation (replaces loop for 3-5x speedup)
             binaural_waves = self.audio_processor.batch_binaural_oscillator(t_total, tay_freqs, stop_event)
             # binaural_waves shape: (num_pairs, num_samples, 2)
-            # Sum all pairs with envelope scaling
-            wave_left += (binaural_waves[:, :, 0] * envelope * 0.015).sum(axis=0)
-            wave_right += (binaural_waves[:, :, 1] * envelope * 0.015).sum(axis=0)
+            # Sum all pairs with envelope scaling, in-place addition
+            wave_left += (binaural_waves[:, :, 0] * envelope * np.float32(0.015)).sum(axis=0)
+            wave_right += (binaural_waves[:, :, 1] * envelope * np.float32(0.015)).sum(axis=0)
+            del binaural_waves
+        # Free envelope, LFOs, and frequency arrays no longer needed
+        del envelope, lfo_left, lfo_right, lr_lfos, f_modulated, mod_depths, all_frequencies
         if update_progress:
             update_progress(0.7)  # After wave generation (with or without taygetan)
         wave_left = self.audio_processor.wave_shaping(wave_left, shape_factor=2.5, stop_event=stop_event)
@@ -978,12 +1087,21 @@ class SoundGenerator:
             update_progress(0.87)  # Reverb 5%
         if stop_event and stop_event.is_set():
             return np.zeros((total_samples, 2), dtype=np.float32)
-        noise_right = self.audio_processor.evolving_noise_layer(t_total + np.random.uniform(0.001, 0.015), stop_event=stop_event)
+        noise_right = self.audio_processor.evolving_noise_layer(t_total + np.float32(np.random.uniform(0.001, 0.015)), stop_event=stop_event)
         noise_left = self.audio_processor.evolving_noise_layer(t_total, stop_event=stop_event)
         if update_progress:
             update_progress(0.89)  # Noise 2%
-        final_wave_left = self.audio_processor.fade_in_out((wave_left + noise_left) * np.random.uniform(0.04, 0.06), stop_event=stop_event)
-        final_wave_right = self.audio_processor.fade_in_out((wave_right + noise_right) * np.random.uniform(0.04, 0.06), stop_event=stop_event)
+        # Combine wave+noise in-place, then apply fade
+        wave_left += noise_left
+        del noise_left
+        wave_left *= np.float32(np.random.uniform(0.04, 0.06))
+        final_wave_left = self.audio_processor.fade_in_out(wave_left, stop_event=stop_event)
+        del wave_left
+        wave_right += noise_right
+        del noise_right
+        wave_right *= np.float32(np.random.uniform(0.04, 0.06))
+        final_wave_right = self.audio_processor.fade_in_out(wave_right, stop_event=stop_event)
+        del wave_right
         if update_progress:
             update_progress(0.92)  # Fade 3%
         # Batch generate pan curve LFOs (2 calls -> 1 vectorized call)
@@ -992,25 +1110,37 @@ class SoundGenerator:
             np.random.uniform(0.03, 0.06)
         ], dtype=np.float32)
         pan_lfos = self.audio_processor.batch_microtonal_lfo(t_total, pan_lfo_freqs)
-        lfo_base = pan_lfos[0]
-        lfo_secondary = 0.3 * pan_lfos[1]
+        # Build pan_curve in-place to reduce temporaries
+        pan_curve = pan_lfos[0]  # Reuse as base buffer
+        pan_curve *= np.float32(0.6)
+        pan_curve += np.float32(0.3) * (np.float32(0.3) * pan_lfos[1])
+        del pan_lfos
         lfo_random = np.random.normal(0, 0.015, total_samples).astype(np.float32)
-        pan_curve = (0.6 * lfo_base + 0.3 * lfo_secondary + 0.1 * lfo_random)
+        pan_curve += np.float32(0.1) * lfo_random
+        del lfo_random
         # Use cached filter coefficients
         b, a = self.audio_processor._get_filter('lowpass', 0.002, 2)
         pan_curve = lfilter(b, a, pan_curve)
         # Use JIT-compiled pan curve processing (float32 native - no conversion needed)
         pan_curve = jit_pan_curve_tanh(pan_curve, 0.6, -0.8, 0.8)
-        drift_freq = np.random.uniform(0.0005, 0.002)
-        drift_amplitude = np.random.uniform(0.01, 0.02)
-        drift = drift_amplitude * np.sin(2 * np.pi * drift_freq * t_total)
-        pan_curve += drift
+        drift_freq = np.float32(np.random.uniform(0.0005, 0.002))
+        drift_amplitude = np.float32(np.random.uniform(0.01, 0.02))
+        pan_curve += drift_amplitude * np.sin(np.float32(TWO_PI) * drift_freq * t_total)
         if update_progress:
             update_progress(0.97)  # Pan curve 5%
-        left_channel_final = final_wave_left * (1 - pan_curve * 0.6)
-        right_channel_final = final_wave_right * (1 + pan_curve * 0.6)
-        stereo_wave = np.column_stack((left_channel_final, right_channel_final))
-        stereo_wave *= self.master_volume
+        # Apply pan curve in-place to avoid temporaries
+        pan_scaled = pan_curve * np.float32(0.6)
+        del pan_curve
+        final_wave_left *= (np.float32(1.0) - pan_scaled)
+        final_wave_right *= (np.float32(1.0) + pan_scaled)
+        del pan_scaled
+
+        # Build stereo_wave directly instead of column_stack (avoids temporary)
+        stereo_wave = np.empty((total_samples, 2), dtype=np.float32)
+        stereo_wave[:, 0] = final_wave_left
+        stereo_wave[:, 1] = final_wave_right
+        del final_wave_left, final_wave_right
+        stereo_wave *= np.float32(self.master_volume)
 
         logging.info(f"=== MAIN STEREO WAVE (before sacred layers) ===")
         logging.info(f"  Left channel: min={stereo_wave[:, 0].min():.6f}, max={stereo_wave[:, 0].max():.6f}, mean={np.mean(np.abs(stereo_wave[:, 0])):.6f}")
@@ -1029,52 +1159,54 @@ class SoundGenerator:
             # Parallelize the three independent sacred layer computations for 3x speedup
             from concurrent.futures import TimeoutError as FuturesTimeoutError
 
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                # Submit all three computations concurrently
-                mercy_future = executor.submit(self.audio_processor.pleroma_mercy_layer, t_total, 7.83)
-                silent_future = executor.submit(self.audio_processor.silent_solfeggio_grid, t_total)
-                dissolution_future = executor.submit(self.audio_processor.archon_dissolution_layer, t_total)
+            # Use shared executor (avoids creating/destroying pool each generation call)
+            mercy_future = self._sacred_executor.submit(self.audio_processor.pleroma_mercy_layer, t_total, 7.83)
+            silent_future = self._sacred_executor.submit(self.audio_processor.silent_solfeggio_grid, t_total)
+            dissolution_future = self._sacred_executor.submit(self.audio_processor.archon_dissolution_layer, t_total)
 
-                # Collect results with timeout and exception handling
-                sacred_timeout = 120.0  # 2 minute timeout per layer
+            # Collect results with timeout and exception handling
+            sacred_timeout = 120.0  # 2 minute timeout per layer
 
-                try:
-                    mercy = mercy_future.result(timeout=sacred_timeout)
-                except FuturesTimeoutError:
-                    logging.error("Pleroma mercy layer timed out")
-                    mercy = np.zeros_like(t_total, dtype=np.float32)
-                except Exception as e:
-                    logging.error(f"Pleroma mercy layer failed: {e}")
-                    mercy = np.zeros_like(t_total, dtype=np.float32)
+            try:
+                mercy = mercy_future.result(timeout=sacred_timeout)
+            except FuturesTimeoutError:
+                logging.error("Pleroma mercy layer timed out")
+                mercy = np.zeros_like(t_total, dtype=np.float32)
+            except Exception as e:
+                logging.error(f"Pleroma mercy layer failed: {e}")
+                mercy = np.zeros_like(t_total, dtype=np.float32)
 
-                try:
-                    silent = silent_future.result(timeout=sacred_timeout)
-                except FuturesTimeoutError:
-                    logging.error("Silent solfeggio grid timed out")
-                    silent = np.zeros_like(t_total, dtype=np.float32)
-                except Exception as e:
-                    logging.error(f"Silent solfeggio grid failed: {e}")
-                    silent = np.zeros_like(t_total, dtype=np.float32)
+            try:
+                silent = silent_future.result(timeout=sacred_timeout)
+            except FuturesTimeoutError:
+                logging.error("Silent solfeggio grid timed out")
+                silent = np.zeros_like(t_total, dtype=np.float32)
+            except Exception as e:
+                logging.error(f"Silent solfeggio grid failed: {e}")
+                silent = np.zeros_like(t_total, dtype=np.float32)
 
-                try:
-                    dissolution = dissolution_future.result(timeout=sacred_timeout)
-                except FuturesTimeoutError:
-                    logging.error("Archon dissolution layer timed out")
-                    dissolution = np.zeros_like(t_total, dtype=np.float32)
-                except Exception as e:
-                    logging.error(f"Archon dissolution layer failed: {e}")
-                    dissolution = np.zeros_like(t_total, dtype=np.float32)
+            try:
+                dissolution = dissolution_future.result(timeout=sacred_timeout)
+            except FuturesTimeoutError:
+                logging.error("Archon dissolution layer timed out")
+                dissolution = np.zeros_like(t_total, dtype=np.float32)
+            except Exception as e:
+                logging.error(f"Archon dissolution layer failed: {e}")
+                dissolution = np.zeros_like(t_total, dtype=np.float32)
 
             logging.info(f"  MERCY layer: min={mercy.min():.8f}, max={mercy.max():.8f}, mean={np.mean(np.abs(mercy)):.8f}")
             logging.info(f"  SILENT layer: min={silent.min():.8f}, max={silent.max():.8f}, mean={np.mean(np.abs(silent)):.8f}")
             logging.info(f"  DISSOLUTION layer: min={dissolution.min():.8f}, max={dissolution.max():.8f}, mean={np.mean(np.abs(dissolution)):.8f}")
 
-            # Combine all sacred layers (applied equally to both channels)
-            sacred_layer = mercy + silent + dissolution
+            # Combine all sacred layers in-place (reuse mercy buffer)
+            sacred_layer = mercy
+            sacred_layer += silent
+            del silent
+            sacred_layer += dissolution
+            del dissolution
             logging.info(f"  COMBINED sacred layer: min={sacred_layer.min():.8f}, max={sacred_layer.max():.8f}, mean={np.mean(np.abs(sacred_layer)):.8f}")
 
             # Log at key time points
-            sample_rate = 48000
             for sec in [0, 5, 10, 15, 30, 45, 60]:
                 if sec < duration:
                     idx = int(sec * sample_rate)
@@ -1084,10 +1216,12 @@ class SoundGenerator:
                         window = sacred_layer[start_idx:end_idx]
                         logging.info(f"    Sacred at {sec:3d}s: amplitude={np.abs(window).mean():.10f}")
 
-            stereo_wave += np.column_stack((sacred_layer, sacred_layer))
+            # Add sacred layer to both channels directly (avoids column_stack temporary)
+            stereo_wave[:, 0] += sacred_layer
+            stereo_wave[:, 1] += sacred_layer
 
-            # Free sacred layer memory now that they're merged
-            del mercy, silent, dissolution, sacred_layer
+            # Free sacred layer memory now that it's merged
+            del mercy, sacred_layer
             gc.collect()
 
             logging.info(f"=== STEREO WAVE (after sacred layers) ===")
@@ -1097,4 +1231,4 @@ class SoundGenerator:
         if update_progress:
             update_progress(1.0)  # Complete
 
-        return stereo_wave.astype(np.float32)
+        return stereo_wave  # Already float32 from np.empty allocation

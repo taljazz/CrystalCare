@@ -40,7 +40,7 @@ class FrequencyManager:
                 "astral_bridge": 1.73205080757,   # exact √3
                 "natural_log": 2.71828182846,     # exact e
                 "crown_portal": 3.14159265359,    # exact π
-                "zero_point": 4.2360679775,       # √18 ≈ 3√2
+                "zero_point": 4.2360679775,       # phi^3 (golden ratio cubed)
                 "remembrance": 1.61803398875,     # exact golden ratio φ
             },
         }

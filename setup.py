@@ -10,7 +10,10 @@ ext_modules = [
 ]
 
 setup(
-    name="simplex5d",
+    name="crystalcare-simplex5d",
+    version="1.0.0",
+    description="5D Simplex noise extension for CrystalCare",
+    python_requires=">=3.10",
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
 )

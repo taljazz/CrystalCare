@@ -4,7 +4,7 @@ REM Runs CrystalCare from the cc conda environment
 
 cd /d "%~dp0"
 
-set CONDA_PYTHON=C:\Users\Thomas\.conda\envs\cc\python.exe
+set CONDA_PYTHON=%USERPROFILE%\.conda\envs\cc\python.exe
 
 if not exist "%CONDA_PYTHON%" (
     echo [ERROR] Python not found at: %CONDA_PYTHON%
