@@ -99,6 +99,18 @@ build.bat
 
 Produces `CrystalCare.zip` containing the standalone executable and user guide.
 
+## System Requirements for Saving
+
+When saving WAV files, the full session is generated in memory before writing to disk. This is computationally intensive — expect 40-55% CPU usage during generation, which is normal. Recommended maximum save durations by system RAM:
+
+| System RAM | Recommended Max Save Duration |
+|-----------|-------------------------------|
+| 16 GB | 15-20 minutes |
+| 32 GB | 30 minutes |
+| 64 GB+ | 60 minutes |
+
+Streaming playback (Play button) is **not** limited by RAM — sessions of any length are supported with ~50 MB constant memory usage. If you need longer saved files, consider saving multiple shorter sessions.
+
 ## Usage Tips
 
 - Use headphones for full 3D immersion (essential for Taygetan Resonances)
