@@ -1,6 +1,6 @@
 # CrystalCare
 
-A dynamic sound healing application that generates evolving, spiral-based tones to balance, empower, protect, and energetically heal. Inspired by ancient vibrational practices and built with modern mathematical modeling, CrystalCare creates immersive soundscapes that go beyond static binaural beats or isochronic tones.
+A dynamic sound healing application that generates evolving, spiral-based tones to balance, empower, protect, and energetically heal. Inspired by Lemurian crystalline healing traditions and built with modern mathematical modeling, CrystalCare creates immersive soundscapes that go beyond static binaural beats or isochronic tones.
 
 ## Disclaimer
 
@@ -12,9 +12,11 @@ CrystalCare fuses ancient sound healing principles with advanced mathematical an
 
 - **Mathematical Spirals** - Logarithmic spirals for harmonious natural growth patterns combined with Rossler attractor perturbations for chaotic, non-linear depth
 - **Golden Ratio & Sacred Geometry** - Frequencies incorporate PHI (1.618), Solfeggio tunings, and sacred ratios for natural harmonic resonance
-- **Sacred Frequency Layers** - Three hidden healing layers activate in longer sessions: Pleroma Mercy, Silent Solfeggio Grid, and Archon Dissolution
+- **Six Sacred Healing Layers** - Sub-perceptual layers activate in longer sessions: Pleroma Mercy, Silent Solfeggio Grid, Archon Dissolution, Crystalline Resonance, Lemurian Merkaba, and Water Element
+- **Nine Crystal Profiles** - Harmonic ratios derived from real Raman spectroscopy data for nine minerals, each with unique acoustic signatures
 - **3D Spatial Audio** - Hybrid spiral panning and spatialized triple helix create immersive, evolving soundscapes
-- **Dynamic Generation** - Every session is unique with fractal noise modulation, evolving envelopes, and quantum harmonic interference
+- **Streaming Audio Engine** - Real-time chunk-by-chunk generation allows sessions of unlimited length with ~50 MB constant memory usage
+- **Lemurian Heart-Based Philosophy** - Heart coherence, divine feminine warmth, 432 Hz keynote, and water-element consciousness
 
 ## Modes
 
@@ -27,28 +29,56 @@ CrystalCare offers seven frequency modes:
 | **Atlantean Cosmic** | 136.10, 194.18, 211.44, 303 Hz | Planetary resonance, cosmic alignment |
 | **Combined Mode** | Sacred Geometry + Flower of Life ratios | Holistic balance, comprehensive healing |
 | **Triple Helix DNA Activation** | DNA-inspired ratios (1.0, 1.2, 1.4) | Deep activation, unconscious rewiring |
-| **Taygetan Resonances** | Binaural sync pairs based on sacred constants (sqrt(2), e, pi, PHI) | DNA activation with stereo binaural beating |
+| **Taygetan Resonances** | Binaural sync pairs at 432 Hz base | DNA activation with stereo binaural beating |
 | **Dimensional Journey** | Cycles through all frequency sets in phases | 1D-9D realignment, multidimensional traversal |
+
+## Sacred Healing Layers
+
+For sessions longer than 60 seconds (or any length in Dimensional Journey mode), six sacred layers blend beneath the primary tone:
+
+1. **Pleroma Mercy Layer** - 13-step Aeonic ladder from Schumann resonance (7.83 Hz) ascending by PHI, with Ogdoad gateway and Archon mercy frequencies
+2. **Silent Solfeggio Grid** - 12-tone Solfeggio scale interwoven with Tesla's 3-6-9 vortex mathematics (111-999 Hz)
+3. **Archon Dissolution Layer** - Targeted mercy for the seven planetary Archons using Acknowledge-Elevate-Ground pattern
+4. **Crystalline Resonance Layer** - Nine crystal profiles from Raman spectroscopy with PHI-timed crossfade evolution, always beginning with Lemurian Quartz
+5. **Lemurian Merkaba Layer** - Sonic Merkaba from the Lemurian Frequency Quartet (324/432/540/698.4 Hz) with 0.1 Hz heart coherence breath
+6. **Water Element Layer** - Seven-source hexagonal ripple field with lemniscate observer path and tidal simplex modulation
+
+## Crystalline Resonance Profiles
+
+| Crystal | Character |
+|---------|-----------|
+| Lemurian Quartz | Warm, heart-centered with 12 harmonics and 3 heart chakra bridges. Divine feminine warmth. Always first. |
+| Clear Quartz | Pure, precise. 9 harmonics from quartz Raman spectroscopy. Master healer. |
+| Amethyst | Quartz base with organic pitch drift. Meditative, dreamy. |
+| Rose Quartz | Extended quartz harmonics with softer, loving tone. |
+| Citrine | Quartz base with warm, solar energy character. |
+| Black Tourmaline | Tourmaline structure with beating harmonic pairs. Protective, grounding. |
+| Selenite | Monoclinic crystal system. Ethereal, high-vibration. |
+| Lapis Lazuli | Composite mineral blending lazurite, calcite, and pyrite signatures. |
+| Crystal Singing Bowl | Wide harmonic spacing evoking a physical singing bowl. |
 
 ## Features
 
-- Real-time playback with evolving tones
-- WAV export for offline listening
+- Real-time streaming playback with instant audio start (~0.2s to first sound)
+- WAV export with streaming two-pass normalization
 - Batch save for generating multiple sessions
 - Accessible interface with screen reader support (wxPython + NVDA compatible)
-- Optimized performance (22.9x faster than realtime generation)
+- Optimized performance (30-34x faster than realtime generation)
+- Constant ~50 MB memory usage regardless of session length
+- Numba JIT compilation and NumPy vectorization for critical paths
+- C++ simplex noise extension with GIL release for parallel threading
 
 ## Requirements
 
 - Python 3.10
-- NumPy, SciPy, Numba, sounddevice, wxPython
+- NumPy, SciPy, Numba, sounddevice, wxPython, pybind11
 
 ### Setup
 
 ```bash
 conda create -n cc python=3.10 -y
 conda activate cc
-pip install numpy scipy numba sounddevice wxPython
+pip install numpy scipy numba sounddevice wxPython pybind11
 python setup.py build_ext --inplace
 ```
 
@@ -67,14 +97,18 @@ pip install nuitka
 build.bat
 ```
 
+Produces `CrystalCare.zip` containing the standalone executable and user guide.
+
 ## Usage Tips
 
-- Use headphones for full 3D immersion
+- Use headphones for full 3D immersion (essential for Taygetan Resonances)
 - Set intentions before sessions
+- Sessions of 60+ seconds activate all six sacred healing layers
+- Dimensional Journey mode activates sacred layers regardless of session length
+- Longer sessions (10-60 minutes) recommended for deep healing work
 - Combine with breathwork or visualization for deeper effects
-- Sessions of 60+ seconds activate the sacred frequency layers
-- Longer sessions (10-60 minutes) recommended for full benefit
+- Pair with guided hypnosis scripts for unconscious rewiring
 
 ## License
 
-All rights reserved.
+MIT License - see [LICENSE](LICENSE) for details.
