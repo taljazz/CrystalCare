@@ -2,6 +2,7 @@ import numpy as np
 import sounddevice as sd
 import wave
 import os
+import queue
 from typing import Optional, Callable, List
 import logging
 import threading
@@ -80,6 +81,137 @@ class SoundPlayer:
                 update_status(f"Playback error: {e}")
         except Exception as e:
             logging.exception(f"Unexpected playback error: {e}")
+            if update_status:
+                update_status(f"Playback error: {e}")
+        finally:
+            if on_complete:
+                on_complete()
+
+    def play_sound_stream(self, duration: float, base_freq: float, sample_rate: int = 48000,
+                          stop_event: Optional[threading.Event] = None,
+                          update_status: Optional[Callable[[str], None]] = None,
+                          on_complete: Optional[Callable[[], None]] = None,
+                          dimensional_mode: bool = False,
+                          **kwargs) -> None:
+        """
+        Streaming playback using producer-consumer pattern.
+        Audio starts playing after the first chunk (~0.2s) instead of waiting for full generation.
+        """
+        try:
+            if update_status:
+                update_status("Generating sound (streaming)...")
+
+            stream_gen = self.sound_generator.generate_dynamic_sound_stream(
+                duration, base_freq, sample_rate,
+                interval_duration_list=[30, 45, 60, 75, 90],
+                stop_event=stop_event,
+                dimensional_mode=dimensional_mode
+            )
+
+            chunk_queue = queue.Queue(maxsize=2)
+            producer_error = [None]  # Mutable container for error propagation
+
+            def producer():
+                try:
+                    for chunk in stream_gen:
+                        if stop_event and stop_event.is_set():
+                            break
+                        # Use timeout on put so we can check stop_event
+                        # if the consumer has stopped reading
+                        while True:
+                            if stop_event and stop_event.is_set():
+                                return
+                            try:
+                                chunk_queue.put(chunk, timeout=0.5)
+                                break
+                            except queue.Full:
+                                continue
+                    chunk_queue.put(None, timeout=1.0)  # Sentinel
+                except Exception as e:
+                    producer_error[0] = e
+                    try:
+                        chunk_queue.put(None, timeout=1.0)
+                    except queue.Full:
+                        pass
+
+            producer_thread = threading.Thread(target=producer, daemon=True, name="CrystalCare-StreamProducer")
+            producer_thread.start()
+
+            if update_status:
+                update_status("Playing sound (streaming)...")
+
+            was_stopped = False
+            sub_chunk_size = int(0.5 * sample_rate)  # 0.5s sub-chunks for responsive stop
+            out_stream = None
+
+            try:
+                out_stream = sd.OutputStream(samplerate=sample_rate, channels=2, dtype='float32')
+                out_stream.start()
+
+                while True:
+                    if stop_event and stop_event.is_set():
+                        was_stopped = True
+                        break
+
+                    try:
+                        chunk = chunk_queue.get(timeout=0.5)
+                    except queue.Empty:
+                        if stop_event and stop_event.is_set():
+                            was_stopped = True
+                            break
+                        continue
+
+                    if chunk is None:
+                        break  # End of stream
+
+                    # Write in sub-chunks for responsive stop
+                    for i in range(0, len(chunk), sub_chunk_size):
+                        if stop_event and stop_event.is_set():
+                            was_stopped = True
+                            break
+                        sub = chunk[i:i + sub_chunk_size]
+                        out_stream.write(sub)
+
+                    del chunk
+
+                    if was_stopped:
+                        break
+
+            except sd.PortAudioError as e:
+                logging.error(f"Stream playback failed: {e}")
+                if update_status:
+                    update_status(f"Playback error: {e}")
+                return
+            finally:
+                # abort() discards buffer immediately (vs stop() which drains it)
+                if out_stream is not None:
+                    try:
+                        out_stream.abort()
+                        out_stream.close()
+                    except Exception:
+                        pass
+
+            # Drain the queue so the producer isn't stuck on put()
+            while not chunk_queue.empty():
+                try:
+                    chunk_queue.get_nowait()
+                except queue.Empty:
+                    break
+
+            # Short join — producer is a daemon thread, no need to wait long
+            producer_thread.join(timeout=0.5)
+
+            gc.collect()
+
+            if was_stopped:
+                if update_status:
+                    update_status("Playback stopped manually.")
+            else:
+                if update_status:
+                    update_status("Playback finished.")
+
+        except Exception as e:
+            logging.exception(f"Unexpected streaming playback error: {e}")
             if update_status:
                 update_status(f"Playback error: {e}")
         finally:

@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.signal import fftconvolve, butter, lfilter
+from scipy.signal import fftconvolve, butter, lfilter, sosfilt
 from scipy.ndimage import shift
 from scipy.integrate import odeint
 from typing import Optional, Dict, List, Callable
@@ -154,6 +154,45 @@ class AudioProcessor:
     # Extended Aeonic ladder - 13 steps from Schumann through PHI harmonics
     AEONIC_EXPONENTS = PHI ** np.arange(13, dtype=np.float32)
 
+    # Lemurian Frequency Quartet — Sonic Merkaba (Jonathan Goldman)
+    # 3:4:5 Pythagorean right triangle ratios + PHI, anchored to 432 Hz keynote
+    MERKABA_KEYNOTE = np.float32(432.0)
+    MERKABA_RATIOS = np.array([0.75, 1.0, 1.25, PHI], dtype=np.float32)  # 3/4, 1, 5/4, PHI
+    MERKABA_FREQS = MERKABA_KEYNOTE * MERKABA_RATIOS  # [324, 432, 540, 698.4]
+
+    # PHI-weighted amplitudes: keynote strongest, earth/spirit balanced, transcendence most subtle
+    # Weights: [1/PHI, 1.0, 1/PHI, 1/PHI²] — sum = PHI² = 2.618 (sacred!)
+    _merkaba_raw = np.array([1.0/PHI, 1.0, 1.0/PHI, 1.0/(PHI*PHI)], dtype=np.float32)
+    MERKABA_WEIGHTS = _merkaba_raw / _merkaba_raw.sum()
+
+    # Triangular + PHI phase offsets (quartz 3-fold symmetry + golden angle)
+    # First 3 form equilateral triangle in phase space; 4th at golden angle
+    MERKABA_PHASES = np.array([0.0, 2*np.pi/3, 4*np.pi/3, 2*np.pi/PHI], dtype=np.float32)
+
+    # Water-Element Sacred Constants (6th sacred layer)
+    # 7 wave sources in hexagonal Seed of Life arrangement (ice crystal geometry)
+    WATER_SOURCE_FREQS = np.array([
+        432.0,   # Center: Lemurian keynote (crystal-water bridge)
+        1.5,     # Ocean swell rhythm (deep tidal)
+        7.83,    # Schumann (Earth-water electromagnetic coupling)
+        111.0,   # Tesla vortex seed (water memory, Emoto experiments)
+        174.0,   # Solfeggio root (Earth Star Chakra, foundation)
+        528.0,   # Love Frequency (Emoto's hexagonal water crystal)
+        963.0,   # Stellar Gateway (water meets cosmic consciousness, 9+6+3=18=9)
+    ], dtype=np.float32)
+
+    WATER_SOURCE_DECAYS = np.array([0.08, 0.01, 0.015, 0.04, 0.05, 0.10, 0.12], dtype=np.float32)
+
+    # Hexagonal phase offsets (ice crystal 6-fold symmetry), center aligned with 963 Hz
+    WATER_HEX_PHASES = np.array([0, 60, 120, 180, 240, 300, 0], dtype=np.float32) * (np.pi / 180)
+
+    # Pre-computed hexagonal source positions (Seed of Life geometry)
+    # [0] = center (0,0); [1-6] = hexagonal ring at radius 1.0
+    _hex_angles = np.arange(6, dtype=np.float32) * (np.pi / 3.0)
+    WATER_SOURCE_POSITIONS = np.zeros((7, 2), dtype=np.float32)
+    WATER_SOURCE_POSITIONS[1:, 0] = np.cos(_hex_angles)
+    WATER_SOURCE_POSITIONS[1:, 1] = np.sin(_hex_angles)
+
     def __init__(self, sample_rate: int = 48000):
         """Initialize AudioProcessor with object pools and cached computations."""
         self.sample_rate = sample_rate
@@ -174,6 +213,10 @@ class AudioProcessor:
 
         # Rössler trajectory cache (keyed by time array characteristics)
         self._rossler_cache = {}
+
+        # Crystal profiles for crystalline resonance layer
+        self._crystal_profiles = self._build_crystal_profiles()
+        self._lemurian_idx = next(i for i, p in enumerate(self._crystal_profiles) if p['name'] == 'Lemurian Quartz')
 
     def _precompute_filters(self):
         """Pre-compute commonly used filter coefficients."""
@@ -198,6 +241,170 @@ class AudioProcessor:
             if key not in self._filter_cache:
                 self._filter_cache[key] = butter(order, cutoff / self.nyquist, btype=filter_type)
             return self._filter_cache[key]
+
+    def _build_crystal_profiles(self):
+        """Build crystal acoustic profiles from crystallographic data (Raman spectroscopy)."""
+        quartz_ratios = np.array([0.276, 0.444, 0.571, 0.765, 1.0, 1.500, 1.741, 2.339, 2.504], dtype=np.float32)
+        tourmaline_ratios = np.array([0.375, 0.583, 1.0, 1.061, 1.098, 2.047], dtype=np.float32)
+        selenite_ratios = np.array([0.412, 0.491, 0.617, 0.669, 1.0, 1.126], dtype=np.float32)
+        bowl_ratios = np.array([1.0, 2.828, 5.424, 9.130], dtype=np.float32)
+        rose_ratios = np.concatenate([quartz_ratios, np.array([2.509, 4.300], dtype=np.float32)])
+        lapis_ratios = np.array([
+            0.472, 1.0, 1.066,
+            0.144, 0.260, 0.656, 1.0,
+            0.905, 1.0, 1.135
+        ], dtype=np.float32)
+        lapis_mineral_weights = np.array([
+            0.5, 0.5, 0.5,
+            0.3, 0.3, 0.3, 0.3,
+            0.2, 0.2, 0.2
+        ], dtype=np.float32)
+
+        lemurian_ratios = np.array([
+            0.276, 0.444, 0.571, 0.765,   # Sub-fundamental quartz (Raman spectroscopy)
+            1.0,                            # Fundamental
+            1.222,                          # 528/432 — Love Frequency ratio (Emoto)
+            1.375,                          # 594/432 — Heart resonance (9/8 × Love)
+            1.500,                          # Quartz harmonic
+            PHI,                            # 698.4/432 — Golden heart (PHI × keynote)
+            1.741,                          # Quartz harmonic
+            2.339, 2.504,                   # Upper quartz (rolled off via weights)
+        ], dtype=np.float32)
+        lemurian_warmth_weights = np.array([
+            0.6, 0.7, 0.8, 0.9,   # Sub-fundamental: warm presence
+            1.0,                    # Fundamental: full strength
+            1.2,                    # Love Frequency: emphasized
+            1.1,                    # Heart resonance: strong
+            0.9,                    # Quartz harmonic
+            1.0,                    # PHI: golden heart
+            0.5,                    # Upper quartz: rolled off
+            0.3, 0.2,              # Highest: gentle presence only
+        ], dtype=np.float32)
+
+        profiles = [
+            {'name': 'Clear Quartz', 'harmonic_ratios': quartz_ratios,
+             'symmetry_order': 3, 'detune_factor': np.float32(0.0),
+             'shimmer_rate': np.float32(0.0), 'beating_pairs': [],
+             'piezo_factor': np.float32(0.02)},
+
+            {'name': 'Amethyst', 'harmonic_ratios': quartz_ratios.copy(),
+             'symmetry_order': 3, 'detune_factor': np.float32(0.008),
+             'shimmer_rate': np.float32(0.0), 'beating_pairs': [],
+             'piezo_factor': np.float32(0.02)},
+
+            {'name': 'Rose Quartz', 'harmonic_ratios': rose_ratios,
+             'symmetry_order': 3, 'detune_factor': np.float32(0.0),
+             'shimmer_rate': np.float32(0.0), 'beating_pairs': [],
+             'piezo_factor': np.float32(0.02)},
+
+            {'name': 'Citrine', 'harmonic_ratios': quartz_ratios.copy(),
+             'symmetry_order': 3, 'detune_factor': np.float32(0.006),
+             'shimmer_rate': np.float32(0.0), 'beating_pairs': [],
+             'piezo_factor': np.float32(0.02)},
+
+            {'name': 'Black Tourmaline', 'harmonic_ratios': tourmaline_ratios,
+             'symmetry_order': 3, 'detune_factor': np.float32(0.0),
+             'shimmer_rate': np.float32(0.0),
+             'beating_pairs': [(2, 3), (3, 4), (2, 4)],
+             'piezo_factor': np.float32(0.025)},
+
+            {'name': 'Selenite', 'harmonic_ratios': selenite_ratios,
+             'symmetry_order': 2, 'detune_factor': np.float32(0.0),
+             'shimmer_rate': np.float32(0.0),
+             'beating_pairs': [(4, 5)],
+             'piezo_factor': np.float32(0.0)},
+
+            {'name': 'Lapis Lazuli', 'harmonic_ratios': lapis_ratios,
+             'symmetry_order': 4, 'detune_factor': np.float32(0.0),
+             'shimmer_rate': np.float32(0.0), 'beating_pairs': [],
+             'piezo_factor': np.float32(0.0),
+             'mineral_weights': lapis_mineral_weights},
+
+            {'name': 'Crystal Singing Bowl', 'harmonic_ratios': bowl_ratios,
+             'symmetry_order': 1, 'detune_factor': np.float32(0.0),
+             'shimmer_rate': np.float32(0.0), 'beating_pairs': [],
+             'piezo_factor': np.float32(0.0),
+             'bowl_beat': np.float32(1.8)},
+
+            {'name': 'Lemurian Quartz', 'harmonic_ratios': lemurian_ratios,
+             'symmetry_order': 3, 'detune_factor': np.float32(0.003),
+             'shimmer_rate': np.float32(1.8),
+             'shimmer_depth': np.float32(0.08),
+             'beating_pairs': [],
+             'piezo_factor': np.float32(0.02),
+             'mineral_weights': lemurian_warmth_weights},
+        ]
+
+        for profile in profiles:
+            ratios = profile['harmonic_ratios']
+            n = len(ratios)
+            weights = np.ones(n, dtype=np.float32)
+            sym = profile['symmetry_order']
+            if sym > 0:
+                for j in range(n):
+                    if (j + 1) % sym == 0:
+                        weights[j] *= np.float32(PHI)
+            if 'mineral_weights' in profile:
+                weights *= profile['mineral_weights']
+            weights /= weights.sum()
+            profile['amplitude_weights'] = weights
+
+        return profiles
+
+    def _generate_crystal_harmonics(self, t: np.ndarray, base_freq: float,
+                                     profile: dict, simplex) -> np.ndarray:
+        """Generate harmonics for a single crystal profile at given time values."""
+        ratios = profile['harmonic_ratios']
+        weights = profile['amplitude_weights']
+        n_ratios = len(ratios)
+        crystal_freqs = base_freq * ratios
+
+        phase_wobble = np.zeros(len(t), dtype=np.float32)
+        if profile['piezo_factor'] > 0:
+            phase_wobble = profile['piezo_factor'] * simplex.generate_noise(
+                (t * np.float32(0.015)).astype(np.float32), np.float32(2.0), 0.0, 0.0, 0.0)
+
+        freqs_2d = crystal_freqs[:, np.newaxis]
+        t_2d = t[np.newaxis, :]
+
+        detune = profile['detune_factor']
+        if detune > 0:
+            detune_noise = detune * simplex.generate_noise(
+                (t * np.float32(0.008)).astype(np.float32), np.float32(3.0), 0.0, 0.0, 0.0)
+            detune_scale = np.arange(1, n_ratios + 1, dtype=np.float32)[:, np.newaxis]
+            phases = TWO_PI * freqs_2d * (np.float32(1.0) + detune_scale * detune_noise[np.newaxis, :]) * t_2d + phase_wobble
+            del detune_noise, detune_scale
+        else:
+            phases = TWO_PI * freqs_2d * t_2d + phase_wobble
+
+        waves = weights[:, np.newaxis] * np.sin(phases)
+        del phases, freqs_2d, t_2d
+        result = waves.sum(axis=0).astype(np.float32)
+        del waves
+
+        if profile['shimmer_rate'] > 0:
+            depth = profile.get('shimmer_depth', np.float32(0.15))
+            shimmer = np.float32(1.0) + depth * np.sin(
+                TWO_PI * profile['shimmer_rate'] * t)
+            result *= shimmer
+            del shimmer
+
+        for pair in profile['beating_pairs']:
+            if len(pair) >= 2:
+                for pi in range(len(pair) - 1):
+                    h1_freq = crystal_freqs[pair[pi]]
+                    h2_freq = crystal_freqs[pair[pi + 1]]
+                    beat = np.sin(TWO_PI * np.float32(h1_freq) * t) * np.sin(TWO_PI * np.float32(h2_freq) * t)
+                    result += np.float32(0.05) * beat
+                    del beat
+
+        if 'bowl_beat' in profile:
+            beat_mod = np.float32(1.0) + np.float32(0.08) * np.sin(
+                TWO_PI * profile['bowl_beat'] * t)
+            result *= beat_mod
+            del beat_mod
+
+        return result
 
     def geometric_modulation(self, t: np.ndarray, ratios: Dict[str, float],
                              modulation_index: float = 0.2,
@@ -691,7 +898,7 @@ class AudioProcessor:
         # Apply envelope, breath, and scale in-place
         fade_envelope *= breath_mod
         del breath_mod
-        fade_envelope *= np.float32(0.0004)
+        fade_envelope *= np.float32(0.0003)
         mercy *= fade_envelope
         del fade_envelope
         logging.info(f"  After envelope+breath+scale: min={mercy.min():.8f}, max={mercy.max():.8f}, mean={np.mean(np.abs(mercy)):.8f}")
@@ -773,7 +980,7 @@ class AudioProcessor:
         # Apply envelope, breath, and scale in-place
         fade_envelope *= breath_mod
         del breath_mod
-        fade_envelope *= np.float32(0.0022)
+        fade_envelope *= np.float32(0.00165)
         combined *= fade_envelope
         del fade_envelope
         logging.info(f"  Final result: min={combined.min():.8f}, max={combined.max():.8f}, mean={np.mean(np.abs(combined)):.8f}")
@@ -871,14 +1078,692 @@ class AudioProcessor:
         logging.info(f"  Post-envelope: min={dissolution.min():.6f}, max={dissolution.max():.6f}, mean={np.mean(np.abs(dissolution)):.6f}")
 
         # Final amplitude in-place - sub-perceptual but present
-        dissolution *= np.float32(0.0003)
-        logging.info(f"  Final result (x0.0003): min={dissolution.min():.8f}, max={dissolution.max():.8f}, mean={np.mean(np.abs(dissolution)):.8f}")
+        dissolution *= np.float32(0.000225)
+        logging.info(f"  Final result: min={dissolution.min():.8f}, max={dissolution.max():.8f}, mean={np.mean(np.abs(dissolution)):.8f}")
 
         # Log amplitude at key time points
         self._log_amplitude_stats("ARCHON_DISSOLUTION", dissolution, t)
         logging.info(f"=== ARCHON DISSOLUTION LAYER END ===")
 
         return dissolution
+
+    def crystalline_resonance_layer(self, t: np.ndarray, base_freq: float,
+                                     total_duration: float) -> np.ndarray:
+        """
+        Evolving Crystalline Resonance Layer — 4th sacred layer.
+
+        Generates crystal lattice harmonics that evolve through a randomly
+        shuffled sequence of crystal types. Each crystal has authentic acoustic
+        properties derived from Raman spectroscopy and crystallographic data.
+        """
+        if t.size == 0:
+            return np.array([], dtype=np.float32)
+
+        if total_duration < 60:
+            return np.zeros_like(t, dtype=np.float32)
+
+        profiles = self._crystal_profiles
+        num_profiles = len(profiles)
+
+        rest = np.random.permutation([i for i in range(num_profiles) if i != self._lemurian_idx])
+        sequence = np.concatenate(([self._lemurian_idx], rest))
+
+        if total_duration < 120:
+            num_crystals = 2
+        elif total_duration < 300:
+            num_crystals = 3
+        elif total_duration < 900:
+            num_crystals = 5
+        elif total_duration < 1800:
+            num_crystals = 7
+        else:
+            num_crystals = num_profiles
+
+        segment_duration = np.float32(total_duration / num_crystals)
+        crossfade_dur = segment_duration / np.float32(PHI)
+        half_xfade = crossfade_dur / np.float32(2.0)
+
+        simplex = self._get_simplex()
+        result = np.zeros_like(t, dtype=np.float32)
+
+        for ci in range(num_crystals):
+            crystal_idx = sequence[ci % num_profiles]
+            profile = profiles[crystal_idx]
+
+            seg_start = np.float32(ci) * segment_duration
+            seg_end = np.float32(ci + 1) * segment_duration
+
+            ext_start = max(np.float32(0), seg_start - half_xfade) if ci > 0 else np.float32(0)
+            ext_end = min(np.float32(total_duration), seg_end + half_xfade) if ci < num_crystals - 1 else np.float32(total_duration)
+            solo_start = (seg_start + half_xfade) if ci > 0 else np.float32(0)
+            solo_end = (seg_end - half_xfade) if ci < num_crystals - 1 else np.float32(total_duration)
+
+            mask = (t >= ext_start) & (t < ext_end)
+            if not np.any(mask):
+                continue
+
+            t_seg = t[mask]
+            wave = self._generate_crystal_harmonics(t_seg, base_freq, profile, simplex)
+
+            weights = np.ones(len(t_seg), dtype=np.float32)
+
+            if ci > 0 and crossfade_dur > 0:
+                fade_mask = t_seg < solo_start
+                if np.any(fade_mask):
+                    x = np.clip((t_seg[fade_mask] - ext_start) / crossfade_dur, 0, 1).astype(np.float32)
+                    weights[fade_mask] = x * x * x * (x * (x * 6 - 15) + 10)
+
+            if ci < num_crystals - 1 and crossfade_dur > 0:
+                fade_mask = t_seg >= solo_end
+                if np.any(fade_mask):
+                    x = np.clip((ext_end - t_seg[fade_mask]) / crossfade_dur, 0, 1).astype(np.float32)
+                    weights[fade_mask] = x * x * x * (x * (x * 6 - 15) + 10)
+
+            result[mask] += wave * weights
+            del wave, weights, t_seg
+
+        fade_envelope = self._sacred_fade_envelope(t, fade_seconds=42.0)
+        breath_mod = np.float32(0.935) + np.float32(0.065) * np.sin(TWO_PI * np.float32(0.009) * t)
+        fade_envelope *= breath_mod
+        del breath_mod
+        fade_envelope *= np.float32(0.0009)
+        result *= fade_envelope
+        del fade_envelope
+
+        return result
+
+    def lemurian_merkaba_layer(self, t: np.ndarray, total_duration: float) -> np.ndarray:
+        """
+        Lemurian Frequency Quartet — 5th sacred layer (Sonic Merkaba).
+
+        Four frequencies derived from the 3:4:5 Pythagorean right triangle + PHI,
+        anchored to 432 Hz keynote (Jonathan Goldman's Lemurian tuning fork system).
+        Creates a diamond-shaped energy field: Foundation, Heart, Expression, Transcendence.
+        Heart coherence breath at 0.1 Hz (HeartMath-documented rhythm).
+        """
+        if t.size == 0:
+            return np.array([], dtype=np.float32)
+
+        if total_duration < 60:
+            return np.zeros_like(t, dtype=np.float32)
+
+        simplex = self._get_simplex()
+
+        # Organic phase wobble from simplex noise (gentle variation)
+        wobble = np.float32(0.015) * simplex.generate_noise(
+            t * np.float32(0.03), np.float32(0.7), np.float32(0.3), np.float32(0.0), np.float32(0.0))
+
+        # Generate 4 Merkaba tones simultaneously (vectorized)
+        freqs = self.MERKABA_FREQS[:, np.newaxis]    # (4, 1)
+        phases = self.MERKABA_PHASES[:, np.newaxis]   # (4, 1)
+        weights = self.MERKABA_WEIGHTS[:, np.newaxis] # (4, 1)
+        t_2d = t[np.newaxis, :]                       # (1, N)
+
+        tones = weights * np.sin(TWO_PI * freqs * t_2d + phases + wobble[np.newaxis, :])
+        merkaba = tones.sum(axis=0).astype(np.float32)
+        del tones, wobble
+
+        # Heart coherence breath at 0.1 Hz (10-second cycle — HeartMath rhythm)
+        breath = np.float32(0.975) + np.float32(0.025) * np.sin(TWO_PI * np.float32(0.1) * t)
+        merkaba *= breath
+        del breath
+
+        # Sacred fade envelope and scale
+        fade_envelope = self._sacred_fade_envelope(t, fade_seconds=48.0)
+        fade_envelope *= np.float32(0.0006)
+        merkaba *= fade_envelope
+        del fade_envelope
+
+        return merkaba
+
+    def water_element_layer(self, t: np.ndarray, total_duration: float) -> np.ndarray:
+        """
+        Water-Element Fluid Modulation — 6th sacred layer.
+
+        Models spatial wave interference from 7 point sources in a hexagonal
+        Seed of Life pattern (ice crystal / quartz cross-section geometry).
+        A moving observation point traces a lemniscate (figure-8) path with
+        simplex perturbation, creating organic, non-periodic amplitude variation
+        as the observer drifts through constructive/destructive interference zones.
+        """
+        if t.size == 0:
+            return np.array([], dtype=np.float32)
+
+        if total_duration < 60:
+            return np.zeros_like(t, dtype=np.float32)
+
+        simplex = self._get_simplex()
+
+        # Simplex perturbation for organic observer drift (computed once)
+        theta_perturb = np.float32(0.15) * simplex.generate_noise(
+            t * np.float32(0.005), np.float32(0.4), np.float32(0.0), np.float32(0.0), np.float32(0.0))
+
+        # Accumulate wave interference from 7 sources (sequential for memory safety)
+        result = np.zeros_like(t, dtype=np.float32)
+
+        for i in range(7):
+            # Lemniscate path (figure-8): x = cos(θ)/(1+sin²(θ)), y = sin(θ)cos(θ)/(1+sin²(θ))
+            theta = TWO_PI * np.float32(0.005) * t + theta_perturb
+            sin_theta = np.sin(theta)
+            cos_theta = np.cos(theta)
+            denom = np.float32(1.0) + sin_theta * sin_theta
+            obs_x = np.float32(0.7) * cos_theta / denom
+            obs_y = np.float32(0.7) * sin_theta * cos_theta / denom
+            del theta, sin_theta, cos_theta, denom
+
+            # Distance from observer to this source
+            dx = obs_x - self.WATER_SOURCE_POSITIONS[i, 0]
+            dy = obs_y - self.WATER_SOURCE_POSITIONS[i, 1]
+            dist = np.sqrt(dx * dx + dy * dy)
+            del obs_x, obs_y, dx, dy
+
+            # Spatial envelope: exponential decay with distance
+            spatial_envelope = np.exp(-self.WATER_SOURCE_DECAYS[i] * dist * np.float32(10.0))
+            del dist
+
+            # Wave from this source
+            wave = np.sin(TWO_PI * self.WATER_SOURCE_FREQS[i] * t + self.WATER_HEX_PHASES[i])
+            wave *= spatial_envelope
+            result += wave
+            del spatial_envelope, wave
+
+        del theta_perturb
+
+        # Normalize by source count
+        result *= np.float32(1.0 / 7.0)
+
+        # Tidal modulation: slow simplex-driven amplitude (~200s period)
+        tidal = np.float32(0.85) + np.float32(0.15) * simplex.generate_noise(
+            t * np.float32(0.0005), np.float32(0.9), np.float32(0.0), np.float32(0.0), np.float32(0.0))
+        result *= tidal
+        del tidal
+
+        # Standing wave resonance: Schumann × Schumann·PHI (nodes and antinodes)
+        standing = np.float32(0.1) * np.sin(TWO_PI * np.float32(7.83) * t) * np.cos(TWO_PI * np.float32(7.83 * PHI) * t)
+        result += standing
+        del standing
+
+        # Breath modulation: 0.007 Hz (~143s period), 11% depth
+        breath = np.float32(0.945) + np.float32(0.055) * np.sin(TWO_PI * np.float32(0.007) * t)
+        result *= breath
+        del breath
+
+        # Sacred fade envelope and scale
+        fade_envelope = self._sacred_fade_envelope(t, fade_seconds=46.0)
+        fade_envelope *= np.float32(0.0012)
+        result *= fade_envelope
+        del fade_envelope
+
+        return result
+
+    # === STREAMING PIPELINE HELPERS ===
+
+    def _compute_envelope_chunk(self, chunk_offset: int, chunk_samples: int,
+                                adsr_params: dict, simplex, total_samples: int) -> np.ndarray:
+        """Compute ADSR envelope for a chunk using global sample indices."""
+        a_samples = adsr_params['a_samples']
+        d_samples = adsr_params['d_samples']
+        s_samples = adsr_params['s_samples']
+        r_samples = adsr_params['r_samples']
+        sustain = adsr_params['sustain']
+        chaos = adsr_params['chaos']
+        overall_scale = adsr_params['overall_scale']
+
+        envelope = np.empty(chunk_samples, dtype=np.float32)
+
+        for i in range(chunk_samples):
+            global_idx = chunk_offset + i
+            if global_idx < a_samples:
+                # Attack phase
+                t_norm = global_idx / max(a_samples, 1)
+                envelope[i] = t_norm ** 1.5
+            elif global_idx < a_samples + d_samples:
+                # Decay phase
+                t_norm = (global_idx - a_samples) / max(d_samples, 1)
+                envelope[i] = 1.0 - (1.0 - sustain) * (t_norm ** 1.2)
+            elif global_idx < a_samples + d_samples + s_samples:
+                # Sustain phase
+                t_norm = (global_idx - a_samples - d_samples) / max(s_samples, 1)
+                wobble = np.float32(0.02) * np.sin(np.float32(TWO_PI * 1.5) * t_norm)
+                envelope[i] = sustain + wobble
+            else:
+                # Release phase
+                release_idx = global_idx - (a_samples + d_samples + s_samples)
+                t_norm = release_idx / max(r_samples, 1)
+                envelope[i] = sustain * (1.0 - t_norm) ** 1.5
+
+        envelope = np.clip(envelope, 0, 1).astype(np.float32)
+        envelope *= overall_scale
+        return envelope
+
+    def _compute_lfo_chunk(self, t_chunk: np.ndarray, lfo_params: dict) -> np.ndarray:
+        """Compute LFO for a chunk from pre-drawn parameters."""
+        lfo1_freq = lfo_params['lfo1_freq']
+        lfo2_freq = lfo_params['lfo2_freq']
+        depth = lfo_params['depth']
+
+        drift = np.float32(0.01) * np.sin(np.float32(0.1 * np.pi) * t_chunk)
+        inner_mod = np.float32(0.3) * np.sin(TWO_PI * np.float32(lfo2_freq) * t_chunk)
+        lfo = (depth + drift) * (np.float32(1.0) + np.sin(TWO_PI * np.float32(lfo1_freq) * t_chunk + inner_mod))
+        del inner_mod, drift
+        return lfo.astype(np.float32)
+
+    def _compute_modulation_chunk(self, t_chunk: np.ndarray, chunk_offset: int,
+                                   chunk_samples: int, schedule: list,
+                                   stop_event=None) -> np.ndarray:
+        """Compute modulation for a chunk from pre-built schedule."""
+        modulation = np.zeros(chunk_samples, dtype=np.float32)
+        chunk_end = chunk_offset + chunk_samples
+
+        for seg_start, seg_end, ratio_set, mod_index in schedule:
+            # Check overlap with this chunk
+            overlap_start = max(chunk_offset, seg_start)
+            overlap_end = min(chunk_end, seg_end)
+            if overlap_start >= overlap_end:
+                continue
+
+            # Local indices within this chunk
+            local_start = overlap_start - chunk_offset
+            local_end = overlap_end - chunk_offset
+            t_seg = t_chunk[local_start:local_end]
+
+            seg_mod = self.geometric_modulation(t_seg, ratio_set, mod_index, stop_event)
+            modulation[local_start:local_end] = seg_mod
+
+        return modulation
+
+    def _sacred_fade_envelope_chunk(self, t_chunk: np.ndarray, total_duration: float,
+                                     fade_seconds: float = 45.0) -> np.ndarray:
+        """Compute sacred fade envelope for a chunk using absolute time positions."""
+        envelope = np.ones(len(t_chunk), dtype=np.float32)
+
+        if total_duration < fade_seconds * 2:
+            # Short session: raised cosine
+            envelope = (np.float32(0.5) - np.float32(0.5) * np.cos(TWO_PI * t_chunk / np.float32(total_duration))).astype(np.float32)
+            return envelope
+
+        for i in range(len(t_chunk)):
+            t_val = t_chunk[i]
+            if t_val < fade_seconds:
+                # Fade in: Perlin smoother step
+                x = t_val / fade_seconds
+                envelope[i] = x * x * x * (x * (x * 6 - 15) + 10)
+            elif t_val > total_duration - fade_seconds:
+                # Fade out: Perlin smoother step
+                x = (total_duration - t_val) / fade_seconds
+                x = max(0.0, min(1.0, x))
+                envelope[i] = x * x * x * (x * (x * 6 - 15) + 10)
+            # else: plateau at 1.0
+
+        return envelope.astype(np.float32)
+
+    # === CHUNK-AWARE SACRED LAYERS ===
+
+    def pleroma_mercy_layer_chunk(self, t_chunk: np.ndarray, total_duration: float,
+                                   base_freq: float = 7.83) -> np.ndarray:
+        """Chunk-aware Pleroma Mercy Layer using absolute time values."""
+        if total_duration < 60:
+            return np.zeros(len(t_chunk), dtype=np.float32)
+
+        simplex = self._get_simplex()
+
+        # Layer 1: 13-step Aeonic Ladder
+        aeonic_harmonics = base_freq * self.AEONIC_EXPONENTS
+        phase_indices = np.arange(13) % 5
+        sacred_phases = self.PENTAGONAL_PHASES[phase_indices]
+        phase_wobble = np.float32(0.08) * simplex.generate_noise(
+            (t_chunk * np.float32(0.00003)).astype(np.float32), 0, 0, 0, 0)
+        aeonic_wave = np.sin(
+            TWO_PI * aeonic_harmonics[:, np.newaxis] * t_chunk +
+            sacred_phases[:, np.newaxis] + phase_wobble
+        ).sum(axis=0)
+        del phase_wobble
+
+        # Layer 2: Ogdoad Gateway
+        ogdoad_phase = simplex.generate_noise(
+            (t_chunk * np.float32(0.00001)).astype(np.float32), 1, 1, 1, 1)
+        ogdoad_phase *= np.float32(0.05)
+        ogdoad_wave = np.sin(TWO_PI * self.OGDOAD_FREQ * t_chunk + ogdoad_phase)
+        del ogdoad_phase
+
+        # Layer 3: Archon Harmonizing
+        archon_amplitudes = np.float32(1.0) / (PHI ** np.arange(7, dtype=np.float32))
+        archon_amplitudes /= archon_amplitudes.sum()
+        archon_phases = self.PENTAGONAL_PHASES[np.arange(7) % 5]
+        archon_mercy = (archon_amplitudes[:, np.newaxis] *
+                        np.sin(TWO_PI * self.ARCHON_SPHERES[:, np.newaxis] * t_chunk +
+                               archon_phases[:, np.newaxis])).sum(axis=0)
+
+        # Combine
+        mercy = aeonic_wave
+        mercy *= np.float32(0.5)
+        mercy += np.float32(0.3) * ogdoad_wave
+        del ogdoad_wave
+        mercy += np.float32(0.2) * archon_mercy
+        del archon_mercy
+        mercy = mercy.astype(np.float32)
+
+        # Fade envelope using absolute time
+        fade_envelope = self._sacred_fade_envelope_chunk(t_chunk, total_duration, fade_seconds=45.0)
+
+        # Breathing modulation
+        breath_mod = np.float32(0.95) + np.float32(0.05) * np.sin(TWO_PI * np.float32(0.012) * t_chunk)
+
+        fade_envelope *= breath_mod
+        del breath_mod
+        fade_envelope *= np.float32(0.0003)
+        mercy *= fade_envelope
+        del fade_envelope
+
+        # Cosine nulling
+        mercy *= np.cos(TWO_PI * (self.SCHUMANN / 1000) * t_chunk)
+        return mercy
+
+    def silent_solfeggio_grid_chunk(self, t_chunk: np.ndarray, total_duration: float) -> np.ndarray:
+        """Chunk-aware Silent Solfeggio Grid using absolute time values."""
+        if total_duration < 60:
+            return np.zeros(len(t_chunk), dtype=np.float32)
+
+        # Solfeggio grid
+        solfeggio_grid = np.sin(TWO_PI * self.SOLFEGGIO[:, np.newaxis] * t_chunk).sum(axis=0)
+
+        # Tesla 3-6-9 vortex
+        tesla_grid = np.sin(TWO_PI * self.TESLA_VORTEX[:, np.newaxis] * t_chunk).sum(axis=0)
+
+        # Fibonacci amplitude (smooth)
+        fib_cycle_freq = 0.004
+        fib_amplitude = np.float32(0.95) + np.float32(0.05) * np.sin(TWO_PI * np.float32(fib_cycle_freq) * t_chunk)
+        fib_amplitude += np.float32(0.02) * np.sin(TWO_PI * np.float32(fib_cycle_freq * PHI) * t_chunk)
+        fib_amplitude = np.clip(fib_amplitude, np.float32(0.88), np.float32(1.0)).astype(np.float32)
+
+        # Combine
+        combined = solfeggio_grid
+        combined *= np.float32(0.6)
+        combined += np.float32(0.4) * tesla_grid
+        del solfeggio_grid, tesla_grid
+        combined = combined.astype(np.float32)
+        combined *= fib_amplitude
+        del fib_amplitude
+
+        # Fade and breath
+        fade_envelope = self._sacred_fade_envelope_chunk(t_chunk, total_duration, fade_seconds=40.0)
+        breath_mod = np.float32(0.925) + np.float32(0.075) * np.sin(TWO_PI * np.float32(0.01) * t_chunk)
+        fade_envelope *= breath_mod
+        del breath_mod
+        fade_envelope *= np.float32(0.00165)
+        combined *= fade_envelope
+        del fade_envelope
+
+        return combined
+
+    def archon_dissolution_layer_chunk(self, t_chunk: np.ndarray, total_duration: float) -> np.ndarray:
+        """Chunk-aware Archon Dissolution Layer using absolute time values."""
+        if total_duration < 30:
+            return np.zeros(len(t_chunk), dtype=np.float32)
+
+        simplex = self._get_simplex()
+        n_archons = len(self.ARCHON_SPHERES)
+        base_phases = self.PENTAGONAL_PHASES[np.arange(n_archons) % 5]
+        archon_freqs = self.ARCHON_SPHERES
+        elevate_freqs = archon_freqs * PHI
+        ground_freqs = archon_freqs / np.maximum(np.round(archon_freqs / self.SCHUMANN), 1)
+        amplitude_scales = np.float32(1.0) / (np.float32(1) + np.arange(n_archons, dtype=np.float32) * np.float32(0.1))
+
+        dissolution = np.zeros(len(t_chunk), dtype=np.float32)
+
+        for i in range(n_archons):
+            phase_var = np.float32(0.1) * simplex.generate_noise(
+                (t_chunk * np.float32(0.00002 * (i + 1))).astype(np.float32),
+                float(i), float(i), float(i), float(i))
+            base_phase = base_phases[i]
+            acknowledge = np.sin(TWO_PI * archon_freqs[i] * t_chunk + base_phase + phase_var)
+            elevate = np.sin(TWO_PI * elevate_freqs[i] * t_chunk + base_phase * PHI + phase_var)
+            ground = np.sin(TWO_PI * ground_freqs[i] * t_chunk + phase_var * 0.5)
+            archon_layer = (np.float32(0.25) * acknowledge + np.float32(0.5) * elevate + np.float32(0.25) * ground) * amplitude_scales[i]
+            dissolution += archon_layer
+            del phase_var, acknowledge, elevate, ground, archon_layer
+
+        dissolution /= np.float32(7.0)
+
+        # Fade and breath
+        fade_envelope = self._sacred_fade_envelope_chunk(t_chunk, total_duration, fade_seconds=50.0)
+        breath_mod = np.float32(0.94) + np.float32(0.06) * np.sin(TWO_PI * np.float32(0.008) * t_chunk)
+        fade_envelope *= breath_mod
+        del breath_mod
+        dissolution *= fade_envelope
+        del fade_envelope
+        dissolution *= np.float32(0.000225)
+
+        return dissolution
+
+    def crystalline_resonance_layer_chunk(self, t_chunk: np.ndarray, total_duration: float,
+                                           base_freq: float, crystal_sequence: np.ndarray) -> np.ndarray:
+        """Chunk-aware Crystalline Resonance Layer using absolute time values."""
+        if total_duration < 60:
+            return np.zeros(len(t_chunk), dtype=np.float32)
+
+        profiles = self._crystal_profiles
+        num_profiles = len(profiles)
+
+        if total_duration < 120:
+            num_crystals = 2
+        elif total_duration < 300:
+            num_crystals = 3
+        elif total_duration < 900:
+            num_crystals = 5
+        elif total_duration < 1800:
+            num_crystals = 7
+        else:
+            num_crystals = num_profiles
+
+        segment_duration = np.float32(total_duration / num_crystals)
+        crossfade_dur = segment_duration / np.float32(PHI)
+        half_xfade = crossfade_dur / np.float32(2.0)
+
+        simplex = self._get_simplex()
+        result = np.zeros(len(t_chunk), dtype=np.float32)
+
+        for ci in range(num_crystals):
+            crystal_idx = crystal_sequence[ci % num_profiles]
+            profile = profiles[crystal_idx]
+
+            seg_start = np.float32(ci) * segment_duration
+            seg_end = np.float32(ci + 1) * segment_duration
+
+            ext_start = max(np.float32(0), seg_start - half_xfade) if ci > 0 else np.float32(0)
+            ext_end = min(np.float32(total_duration), seg_end + half_xfade) if ci < num_crystals - 1 else np.float32(total_duration)
+            solo_start = (seg_start + half_xfade) if ci > 0 else np.float32(0)
+            solo_end = (seg_end - half_xfade) if ci < num_crystals - 1 else np.float32(total_duration)
+
+            mask = (t_chunk >= ext_start) & (t_chunk < ext_end)
+            if not np.any(mask):
+                continue
+
+            t_seg = t_chunk[mask]
+            wave = self._generate_crystal_harmonics(t_seg, base_freq, profile, simplex)
+
+            weights = np.ones(len(t_seg), dtype=np.float32)
+
+            if ci > 0 and crossfade_dur > 0:
+                fade_mask = t_seg < solo_start
+                if np.any(fade_mask):
+                    x = np.clip((t_seg[fade_mask] - ext_start) / crossfade_dur, 0, 1).astype(np.float32)
+                    weights[fade_mask] = x * x * x * (x * (x * 6 - 15) + 10)
+
+            if ci < num_crystals - 1 and crossfade_dur > 0:
+                fade_mask = t_seg >= solo_end
+                if np.any(fade_mask):
+                    x = np.clip((ext_end - t_seg[fade_mask]) / crossfade_dur, 0, 1).astype(np.float32)
+                    weights[fade_mask] = x * x * x * (x * (x * 6 - 15) + 10)
+
+            result[mask] += wave * weights
+            del wave, weights, t_seg
+
+        fade_envelope = self._sacred_fade_envelope_chunk(t_chunk, total_duration, fade_seconds=42.0)
+        breath_mod = np.float32(0.935) + np.float32(0.065) * np.sin(TWO_PI * np.float32(0.009) * t_chunk)
+        fade_envelope *= breath_mod
+        del breath_mod
+        fade_envelope *= np.float32(0.0009)
+        result *= fade_envelope
+        del fade_envelope
+
+        return result
+
+    def lemurian_merkaba_layer_chunk(self, t_chunk: np.ndarray,
+                                      total_duration: float) -> np.ndarray:
+        """
+        Chunk-aware Lemurian Frequency Quartet (Sonic Merkaba) — 5th sacred layer.
+
+        Fully stateless: no state carried between chunks. All 4 frequencies are
+        pure tones with fixed phases, so each chunk is independent.
+        """
+        if total_duration < 60:
+            return np.zeros(len(t_chunk), dtype=np.float32)
+
+        simplex = self._get_simplex()
+
+        # Organic phase wobble from simplex noise
+        wobble = np.float32(0.015) * simplex.generate_noise(
+            t_chunk * np.float32(0.03), np.float32(0.7), np.float32(0.3), np.float32(0.0), np.float32(0.0))
+
+        # Generate 4 Merkaba tones simultaneously (vectorized)
+        freqs = self.MERKABA_FREQS[:, np.newaxis]    # (4, 1)
+        phases = self.MERKABA_PHASES[:, np.newaxis]   # (4, 1)
+        weights = self.MERKABA_WEIGHTS[:, np.newaxis] # (4, 1)
+        t_2d = t_chunk[np.newaxis, :]                 # (1, N)
+
+        tones = weights * np.sin(TWO_PI * freqs * t_2d + phases + wobble[np.newaxis, :])
+        merkaba = tones.sum(axis=0).astype(np.float32)
+        del tones, wobble
+
+        # Heart coherence breath at 0.1 Hz (10-second cycle — HeartMath rhythm)
+        breath = np.float32(0.975) + np.float32(0.025) * np.sin(TWO_PI * np.float32(0.1) * t_chunk)
+        merkaba *= breath
+        del breath
+
+        # Sacred fade envelope and scale
+        fade_envelope = self._sacred_fade_envelope_chunk(t_chunk, total_duration, fade_seconds=48.0)
+        fade_envelope *= np.float32(0.0006)
+        merkaba *= fade_envelope
+        del fade_envelope
+
+        return merkaba
+
+    def water_element_layer_chunk(self, t_chunk: np.ndarray,
+                                   total_duration: float) -> np.ndarray:
+        """
+        Chunk-aware Water-Element Fluid Modulation — 6th sacred layer.
+
+        Fully stateless: no state carried between chunks. Observer position,
+        distances, wave phases — all deterministic from absolute time values.
+        """
+        if total_duration < 60:
+            return np.zeros(len(t_chunk), dtype=np.float32)
+
+        simplex = self._get_simplex()
+
+        # Simplex perturbation for organic observer drift
+        theta_perturb = np.float32(0.15) * simplex.generate_noise(
+            t_chunk * np.float32(0.005), np.float32(0.4), np.float32(0.0), np.float32(0.0), np.float32(0.0))
+
+        # Accumulate wave interference from 7 sources (sequential for memory safety)
+        result = np.zeros(len(t_chunk), dtype=np.float32)
+
+        for i in range(7):
+            # Lemniscate path (figure-8)
+            theta = TWO_PI * np.float32(0.005) * t_chunk + theta_perturb
+            sin_theta = np.sin(theta)
+            cos_theta = np.cos(theta)
+            denom = np.float32(1.0) + sin_theta * sin_theta
+            obs_x = np.float32(0.7) * cos_theta / denom
+            obs_y = np.float32(0.7) * sin_theta * cos_theta / denom
+            del theta, sin_theta, cos_theta, denom
+
+            # Distance from observer to this source
+            dx = obs_x - self.WATER_SOURCE_POSITIONS[i, 0]
+            dy = obs_y - self.WATER_SOURCE_POSITIONS[i, 1]
+            dist = np.sqrt(dx * dx + dy * dy)
+            del obs_x, obs_y, dx, dy
+
+            # Spatial envelope: exponential decay with distance
+            spatial_envelope = np.exp(-self.WATER_SOURCE_DECAYS[i] * dist * np.float32(10.0))
+            del dist
+
+            # Wave from this source
+            wave = np.sin(TWO_PI * self.WATER_SOURCE_FREQS[i] * t_chunk + self.WATER_HEX_PHASES[i])
+            wave *= spatial_envelope
+            result += wave
+            del spatial_envelope, wave
+
+        del theta_perturb
+
+        # Normalize by source count
+        result *= np.float32(1.0 / 7.0)
+
+        # Tidal modulation: slow simplex-driven amplitude (~200s period)
+        tidal = np.float32(0.85) + np.float32(0.15) * simplex.generate_noise(
+            t_chunk * np.float32(0.0005), np.float32(0.9), np.float32(0.0), np.float32(0.0), np.float32(0.0))
+        result *= tidal
+        del tidal
+
+        # Standing wave resonance: Schumann × Schumann·PHI
+        standing = np.float32(0.1) * np.sin(TWO_PI * np.float32(7.83) * t_chunk) * np.cos(TWO_PI * np.float32(7.83 * PHI) * t_chunk)
+        result += standing
+        del standing
+
+        # Breath modulation: 0.007 Hz (~143s period), 11% depth
+        breath = np.float32(0.945) + np.float32(0.055) * np.sin(TWO_PI * np.float32(0.007) * t_chunk)
+        result *= breath
+        del breath
+
+        # Sacred fade envelope and scale
+        fade_envelope = self._sacred_fade_envelope_chunk(t_chunk, total_duration, fade_seconds=46.0)
+        fade_envelope *= np.float32(0.0012)
+        result *= fade_envelope
+        del fade_envelope
+
+        return result
+
+
+class StreamingReverb:
+    """Overlap-add FFT convolution with tail carry between chunks."""
+
+    def __init__(self, sample_rate: int = 48000):
+        decay = 0.75
+        reverb_length = int(sample_rate * 2.618)
+        ir = jit_exponential_decay(reverb_length, decay)
+        ir += 0.08 * np.sin(np.linspace(0, TWO_PI * PHI, reverb_length, dtype=np.float32))
+        ir /= np.max(np.abs(ir))
+        self._ir = ir.astype(np.float32)
+        self._ir_len = len(ir)
+        self._tail = np.zeros(self._ir_len - 1, dtype=np.float32)
+
+    def process_chunk(self, chunk: np.ndarray) -> np.ndarray:
+        """Convolve chunk with IR using overlap-add, carry tail to next chunk."""
+        sig_len = len(chunk)
+        ir_len = self._ir_len
+
+        # FFT convolution
+        full_output = fftconvolve(chunk, self._ir, mode='full').astype(np.float32)
+
+        # Add previous tail to beginning
+        tail_add = min(len(self._tail), len(full_output))
+        full_output[:tail_add] += self._tail[:tail_add]
+
+        # Save new tail for next chunk
+        if len(full_output) > sig_len:
+            new_tail = full_output[sig_len:].copy()
+            # Pad or trim to standard tail size
+            if len(new_tail) < ir_len - 1:
+                padded = np.zeros(ir_len - 1, dtype=np.float32)
+                padded[:len(new_tail)] = new_tail
+                self._tail = padded
+            else:
+                self._tail = new_tail[:ir_len - 1]
+        else:
+            self._tail = np.zeros(ir_len - 1, dtype=np.float32)
+
+        return full_output[:sig_len]
 
 
 class ChaoticSelector:
@@ -908,9 +1793,9 @@ class SoundGenerator:
         self.frequency_manager = frequency_manager
         self.audio_processor = audio_processor
         self.chaotic_selector = ChaoticSelector()
-        self.master_volume: float = 0.35
+        self.master_volume: float = 0.40
         # Shared thread pool for sacred layer computation (reused across generations)
-        self._sacred_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="Sacred")
+        self._sacred_executor = ThreadPoolExecutor(max_workers=6, thread_name_prefix="Sacred")
 
     def shutdown(self) -> None:
         """Shut down the shared sacred layer thread pool."""
@@ -1104,21 +1989,28 @@ class SoundGenerator:
         del wave_right
         if update_progress:
             update_progress(0.92)  # Fade 3%
-        # Batch generate pan curve LFOs (2 calls -> 1 vectorized call)
-        pan_lfo_freqs = np.array([
-            np.random.uniform(0.01, 0.02),
-            np.random.uniform(0.03, 0.06)
-        ], dtype=np.float32)
-        pan_lfos = self.audio_processor.batch_microtonal_lfo(t_total, pan_lfo_freqs)
-        # Build pan_curve in-place to reduce temporaries
-        pan_curve = pan_lfos[0]  # Reuse as base buffer
-        pan_curve *= np.float32(0.6)
-        pan_curve += np.float32(0.3) * (np.float32(0.3) * pan_lfos[1])
-        del pan_lfos
-        lfo_random = np.random.normal(0, 0.015, total_samples).astype(np.float32)
-        pan_curve += np.float32(0.1) * lfo_random
-        del lfo_random
-        # Use cached filter coefficients
+        # Toroidal panning — sound moves along surface of a torus
+        # PHI ratio between theta/phi frequencies means the path never exactly repeats
+        R = np.float32(0.6)   # Major radius — overall pan width
+        r = np.float32(0.3)   # Minor radius — modulation depth
+
+        theta_freq = np.float32(np.random.uniform(0.01, 0.02))  # Major cycle
+        phi_freq = theta_freq * np.float32(PHI)                   # Minor cycle (PHI ratio = never repeats)
+
+        # Simplex perturbation for organic drift
+        simplex = self.audio_processor._get_simplex()
+        theta_perturb = np.float32(0.15) * simplex.generate_noise(t_total * np.float32(0.005), 0.0, 0.0, 0.0, 0.0)
+        phi_perturb = np.float32(0.15) * simplex.generate_noise(t_total * np.float32(0.007), np.float32(1.0), 0.0, 0.0, 0.0)
+
+        theta = TWO_PI * theta_freq * t_total + theta_perturb
+        phi = TWO_PI * phi_freq * t_total + phi_perturb
+        del theta_perturb, phi_perturb
+
+        # Torus x-coordinate as pan value, normalized to [-1, 1]
+        pan_curve = ((R + r * np.cos(phi)) * np.cos(theta) / (R + r)).astype(np.float32)
+        del theta, phi
+
+        # Low-pass filter for smoothing
         b, a = self.audio_processor._get_filter('lowpass', 0.002, 2)
         pan_curve = lfilter(b, a, pan_curve)
         # Use JIT-compiled pan curve processing (float32 native - no conversion needed)
@@ -1163,6 +2055,9 @@ class SoundGenerator:
             mercy_future = self._sacred_executor.submit(self.audio_processor.pleroma_mercy_layer, t_total, 7.83)
             silent_future = self._sacred_executor.submit(self.audio_processor.silent_solfeggio_grid, t_total)
             dissolution_future = self._sacred_executor.submit(self.audio_processor.archon_dissolution_layer, t_total)
+            crystalline_future = self._sacred_executor.submit(self.audio_processor.crystalline_resonance_layer, t_total, base_freq, duration)
+            merkaba_future = self._sacred_executor.submit(self.audio_processor.lemurian_merkaba_layer, t_total, duration)
+            water_future = self._sacred_executor.submit(self.audio_processor.water_element_layer, t_total, duration)
 
             # Collect results with timeout and exception handling
             sacred_timeout = 120.0  # 2 minute timeout per layer
@@ -1194,19 +2089,40 @@ class SoundGenerator:
                 logging.error(f"Archon dissolution layer failed: {e}")
                 dissolution = np.zeros_like(t_total, dtype=np.float32)
 
+            try:
+                crystalline = crystalline_future.result(timeout=sacred_timeout)
+            except FuturesTimeoutError:
+                logging.error("Crystalline resonance layer timed out")
+                crystalline = np.zeros_like(t_total, dtype=np.float32)
+            except Exception as e:
+                logging.error(f"Crystalline resonance layer failed: {e}")
+                crystalline = np.zeros_like(t_total, dtype=np.float32)
+
+            try:
+                merkaba = merkaba_future.result(timeout=sacred_timeout)
+            except FuturesTimeoutError:
+                logging.error("Lemurian merkaba layer timed out")
+                merkaba = np.zeros_like(t_total, dtype=np.float32)
+            except Exception as e:
+                logging.error(f"Lemurian merkaba layer failed: {e}")
+                merkaba = np.zeros_like(t_total, dtype=np.float32)
+
+            try:
+                water = water_future.result(timeout=sacred_timeout)
+            except FuturesTimeoutError:
+                logging.error("Water element layer timed out")
+                water = np.zeros_like(t_total, dtype=np.float32)
+            except Exception as e:
+                logging.error(f"Water element layer failed: {e}")
+                water = np.zeros_like(t_total, dtype=np.float32)
+
             logging.info(f"  MERCY layer: min={mercy.min():.8f}, max={mercy.max():.8f}, mean={np.mean(np.abs(mercy)):.8f}")
             logging.info(f"  SILENT layer: min={silent.min():.8f}, max={silent.max():.8f}, mean={np.mean(np.abs(silent)):.8f}")
             logging.info(f"  DISSOLUTION layer: min={dissolution.min():.8f}, max={dissolution.max():.8f}, mean={np.mean(np.abs(dissolution)):.8f}")
 
-            # Combine all sacred layers in-place (reuse mercy buffer)
-            sacred_layer = mercy
-            sacred_layer += silent
-            del silent
-            sacred_layer += dissolution
-            del dissolution
+            # Log combined amplitude at key time points
+            sacred_layer = mercy + silent + dissolution
             logging.info(f"  COMBINED sacred layer: min={sacred_layer.min():.8f}, max={sacred_layer.max():.8f}, mean={np.mean(np.abs(sacred_layer)):.8f}")
-
-            # Log at key time points
             for sec in [0, 5, 10, 15, 30, 45, 60]:
                 if sec < duration:
                     idx = int(sec * sample_rate)
@@ -1215,13 +2131,25 @@ class SoundGenerator:
                         end_idx = min(len(sacred_layer), idx + sample_rate // 2)
                         window = sacred_layer[start_idx:end_idx]
                         logging.info(f"    Sacred at {sec:3d}s: amplitude={np.abs(window).mean():.10f}")
+            del sacred_layer
 
-            # Add sacred layer to both channels directly (avoids column_stack temporary)
-            stereo_wave[:, 0] += sacred_layer
-            stereo_wave[:, 1] += sacred_layer
+            # Toroidal panning for each sacred layer — each drifts independently
+            # Much slower than main panning, sacred layers are deep and gradual
+            sacred_theta_freqs = [np.float32(0.003), np.float32(0.005), np.float32(0.004), np.float32(0.0035), np.float32(0.0028), np.float32(0.0045)]  # pleroma, solfeggio, archon, crystalline, merkaba, water
+            sacred_R = np.float32(0.6)
+            sacred_r = np.float32(0.3)
+            for layer, st_freq in zip([mercy, silent, dissolution, crystalline, merkaba, water], sacred_theta_freqs):
+                sp_freq = st_freq * np.float32(PHI)
+                s_theta = TWO_PI * st_freq * t_total
+                s_phi = TWO_PI * sp_freq * t_total
+                sacred_pan = ((sacred_R + sacred_r * np.cos(s_phi)) * np.cos(s_theta) / (sacred_R + sacred_r)).astype(np.float32)
+                sacred_pan_scaled = sacred_pan * np.float32(0.4)  # Gentler range than main
+                stereo_wave[:, 0] += layer * (np.float32(1.0) - sacred_pan_scaled)
+                stereo_wave[:, 1] += layer * (np.float32(1.0) + sacred_pan_scaled)
+                del sacred_pan, sacred_pan_scaled
 
             # Free sacred layer memory now that it's merged
-            del mercy, sacred_layer
+            del mercy, silent, dissolution, crystalline, merkaba, water
             gc.collect()
 
             logging.info(f"=== STEREO WAVE (after sacred layers) ===")
@@ -1232,3 +2160,410 @@ class SoundGenerator:
             update_progress(1.0)  # Complete
 
         return stereo_wave  # Already float32 from np.empty allocation
+
+    def generate_dynamic_sound_stream(self, duration: float, base_freq: float,
+                                       sample_rate: int = 48000,
+                                       interval_duration_list: List[int] = [30, 45, 60, 75, 90],
+                                       stop_event: Optional[threading.Event] = None,
+                                       update_progress: Optional[Callable[[float], None]] = None,
+                                       dimensional_mode: bool = False):
+        """
+        Streaming generator that yields (chunk_samples, 2) float32 stereo chunks.
+        Produces identical audio to generate_dynamic_sound() but with ~50 MB peak memory.
+        """
+        total_samples = int(sample_rate * duration)
+        chunk_seconds = 10
+        chunk_size = chunk_seconds * sample_rate
+
+        # ========== PRE-COMPUTATION PHASE ==========
+
+        # --- Modulation schedule ---
+        schedule = []
+        current_index = 0
+        remaining_duration = duration
+        selected_ratio_set = {}
+
+        if dimensional_mode:
+            dimension_phases = [0, 2, 1, 3, 4, 3, 5, 'all']
+            num_phases = len(dimension_phases)
+            phase_duration = duration / num_phases
+            phase_samples = int(sample_rate * phase_duration)
+            for phase_idx, sub_selection in enumerate(dimension_phases):
+                if stop_event and stop_event.is_set():
+                    return
+                if sub_selection == 'all':
+                    selected_ratio_set = {k: v for set_dict in self.frequency_manager.ratio_sets.values() for k, v in set_dict.items()}
+                else:
+                    frequencies = self.frequency_manager.get_frequencies(sub_selection)
+                    selected_ratio_set = self.frequency_manager.select_random_ratio_set(stop_event)
+                modulation_index = np.random.uniform(0.2, 0.25)
+                seg_end = min(current_index + phase_samples, total_samples)
+                schedule.append((current_index, seg_end, dict(selected_ratio_set), modulation_index))
+                current_index = seg_end
+        else:
+            interval_count = 0
+            while remaining_duration > 0 and (not stop_event or not stop_event.is_set()):
+                interval_duration = interval_duration_list[interval_count % len(interval_duration_list)]
+                interval_duration = min(interval_duration, remaining_duration)
+                segment_samples = int(sample_rate * interval_duration)
+                selected_ratio_set = self.frequency_manager.select_random_ratio_set(stop_event)
+                modulation_index = np.random.uniform(0.2, 0.25)
+                seg_end = min(current_index + segment_samples, total_samples)
+                schedule.append((current_index, seg_end, dict(selected_ratio_set), modulation_index))
+                current_index = seg_end
+                remaining_duration -= interval_duration
+                interval_count += 1
+
+        if stop_event and stop_event.is_set():
+            return
+
+        # --- Random parameters (drawn once) ---
+        chaotic_factor = self.chaotic_selector.next_value(stop_event)
+        chaos_val = self.chaotic_selector.next_value(stop_event) if not (stop_event and stop_event.is_set()) else 0.5
+
+        # ADSR parameters
+        fib_ratios = np.array([1.618, 2.618, 4.236, 6.854, 11.090, 17.944], dtype=np.float32)
+        base_scale = 6.0 + chaos_val * 0.5
+        attack, decay_r, sustain, release = np.random.choice(fib_ratios, 4) / base_scale
+        a_samples = int(attack * sample_rate * (1 + chaos_val * 0.2))
+        d_samples = int(decay_r * sample_rate * (1 + chaos_val * 0.2))
+        r_samples = int(release * sample_rate * (1 + chaos_val * 0.2))
+        s_samples = total_samples - (a_samples + d_samples + r_samples)
+        if s_samples < 0:
+            s_samples = 0
+            r_samples = total_samples - (a_samples + d_samples)
+            if r_samples < 0:
+                r_samples = 0
+        adsr_params = {
+            'a_samples': a_samples, 'd_samples': d_samples,
+            's_samples': s_samples, 'r_samples': r_samples,
+            'sustain': float(sustain), 'chaos': chaos_val,
+            'overall_scale': np.float32(np.random.uniform(0.95, 1.05))
+        }
+
+        # LFO parameters
+        lfo_left_params = {
+            'lfo1_freq': float(0.05 * (PHI ** np.random.uniform(-0.05, 0.05))),
+            'lfo2_freq': float(0.05 * (PHI ** np.random.uniform(-0.05, 0.05)) * np.random.uniform(0.99, 1.01)),
+            'depth': np.float32(np.random.uniform(0.002, 0.006))
+        }
+        lfo_right_params = {
+            'lfo1_freq': float(0.05 * (PHI ** np.random.uniform(-0.05, 0.05))),
+            'lfo2_freq': float(0.05 * (PHI ** np.random.uniform(-0.05, 0.05)) * np.random.uniform(0.99, 1.01)),
+            'depth': np.float32(np.random.uniform(0.002, 0.006))
+        }
+
+        # Toroidal panning parameters (drawn once, applied per chunk)
+        torus_theta_freq = np.float32(np.random.uniform(0.01, 0.02))
+        torus_phi_freq = torus_theta_freq * np.float32(PHI)
+        torus_R = np.float32(0.6)
+        torus_r = np.float32(0.3)
+        simplex_pan = Simplex5D(13)  # Dedicated instance for pan perturbation
+
+        # Sacred layer toroidal panning frequencies (slow, independent per layer)
+        sacred_theta_freqs = [np.float32(0.003), np.float32(0.005), np.float32(0.004), np.float32(0.0035), np.float32(0.0028), np.float32(0.0045)]  # pleroma, solfeggio, archon, crystalline, merkaba, water
+        sacred_phi_freqs = [f * np.float32(PHI) for f in sacred_theta_freqs]
+        sacred_R = np.float32(0.6)
+        sacred_r = np.float32(0.3)
+
+        # Crystal sequence for crystalline resonance layer (drawn once, passed to each chunk)
+        # Lemurian Quartz always first — every session starts with divine feminine heart energy
+        num_crystal_profiles = len(self.audio_processor._crystal_profiles)
+        lemurian_idx = self.audio_processor._lemurian_idx
+        rest = np.random.permutation([i for i in range(num_crystal_profiles) if i != lemurian_idx])
+        crystal_sequence = np.concatenate(([lemurian_idx], rest))
+
+        # Noise and fade parameters
+        noise_scale_left = np.float32(np.random.uniform(0.04, 0.06))
+        noise_scale_right = np.float32(np.random.uniform(0.04, 0.06))
+        noise_offset_right = np.float32(np.random.uniform(0.001, 0.015))
+        fade_duration = int(np.random.choice([15, 30]))
+        fade_samples = int(fade_duration * sample_rate)
+        if 2 * fade_samples > total_samples:
+            fade_samples = total_samples // 2
+
+        # Pan drift parameters
+        drift_freq = np.float32(np.random.uniform(0.0005, 0.002))
+        drift_amplitude = np.float32(np.random.uniform(0.01, 0.02))
+
+        # Frequency sets
+        freq_set = base_freq * self.PHI_EXPONENTS_6 * np.random.uniform(0.98, 1.02, size=6).astype(np.float32)
+        freq_set = np.concatenate([
+            freq_set,
+            base_freq * self.RATIO_1_3_EXPONENTS_3 * np.random.uniform(0.98, 1.02, size=3).astype(np.float32)
+        ])
+        subharmonics = base_freq / self.SUBHARMONIC_DIVISORS * np.random.uniform(0.95, 1.05, size=4).astype(np.float32)
+        all_frequencies = np.concatenate([freq_set, subharmonics]).astype(np.float32)
+        del freq_set, subharmonics
+
+        mod_depths = np.random.uniform(0.15, 0.35, len(all_frequencies)).astype(np.float32)
+
+        # Dedicated Simplex instances
+        simplex_envelope = Simplex5D(42)
+        simplex_fractal = Simplex5D(7)
+
+        # Check taygetan
+        has_taygetan = 'taygetan' in selected_ratio_set
+        tay_freqs = self.frequency_manager.get_frequencies(5) if has_taygetan else None
+
+        # --- IIR filter states (SOS format for stateful sosfilt) ---
+        # Compute low-pass coefficients ONCE — changing sos between chunks while
+        # carrying zi state produces discontinuities (pops/clicks at boundaries).
+        cutoff_variation = np.random.uniform(-25, 25)
+        normalized_cutoff = np.clip((2200 + cutoff_variation) / (0.5 * sample_rate), 0.1, 0.99)
+        sos_lowpass = butter(4, normalized_cutoff, btype='low', output='sos')
+        zi_left = None
+        zi_right = None
+
+        # Pan curve filter
+        sos_pan = butter(2, 0.002 / (0.5 * sample_rate), btype='low', output='sos')
+        zi_pan = None
+
+        # --- Reverb instances ---
+        reverb_left = StreamingReverb(sample_rate)
+        reverb_right = StreamingReverb(sample_rate)
+
+        # --- 12-sample right-channel delay buffer ---
+        delay_buffer = np.zeros(12, dtype=np.float32)
+
+        # --- Normalization: estimate peak from 0.5s sample at full envelope + LFO peak ---
+        # Use envelope=1.0 (peak of attack) to estimate the loudest the signal can get,
+        # matching batch pipeline's global-max normalization behavior.
+        est_samples = min(int(0.5 * sample_rate), total_samples)
+        quarter_period = 1.0 / (4.0 * max(lfo_left_params['lfo1_freq'], 0.001))
+        est_t = np.linspace(quarter_period, quarter_period + 0.5, est_samples, endpoint=False, dtype=np.float32)
+        est_envelope = np.ones(est_samples, dtype=np.float32)  # Full envelope (ADSR peak)
+        est_lfo = self.audio_processor._compute_lfo_chunk(est_t, lfo_left_params)
+        est_wave = jit_generate_harmonics_vectorized(all_frequencies, est_t, est_envelope, est_lfo, mod_depths)
+        est_wave = jit_wave_shaping(est_wave, 2.5)
+        est_peak = max(np.max(np.abs(est_wave)), 0.001)
+        norm_gain = np.float32(1.0 / (est_peak * 1.3))
+        del est_t, est_envelope, est_lfo, est_wave
+
+        # ========== PER-CHUNK LOOP ==========
+        num_chunks = (total_samples + chunk_size - 1) // chunk_size
+
+        for chunk_idx in range(num_chunks):
+            if stop_event and stop_event.is_set():
+                return
+
+            chunk_offset = chunk_idx * chunk_size
+            chunk_samples = min(chunk_size, total_samples - chunk_offset)
+
+            # Time array for this chunk (absolute time values)
+            t_start = chunk_offset / sample_rate
+            t_end = (chunk_offset + chunk_samples) / sample_rate
+            t_chunk = np.linspace(t_start, t_end, chunk_samples, endpoint=False, dtype=np.float32)
+
+            # --- Stage 1: Modulation ---
+            modulation = self.audio_processor._compute_modulation_chunk(
+                t_chunk, chunk_offset, chunk_samples, schedule, stop_event)
+
+            # --- Stage 2: Fractal variation ---
+            base_noise = simplex_fractal.generate_noise(
+                t_chunk * np.float32(0.02), np.float32(base_freq * 0.01), 0.0, 0.0, 0.0)
+            variation = base_noise * np.float32(0.5)
+            # Use second simplex call instead of np.roll for streaming
+            variation2 = simplex_fractal.generate_noise(
+                t_chunk * np.float32(0.02), np.float32(base_freq * 0.01), np.float32(1.0), 0.0, 0.0)
+            variation += variation2 * np.float32(0.3)
+            del variation2
+            variation += base_noise * base_noise * np.float32(0.2)
+            del base_noise
+            # LFO for fractal
+            frac_lfo = self.audio_processor._compute_lfo_chunk(t_chunk, {'lfo1_freq': 0.01, 'lfo2_freq': 0.01, 'depth': np.float32(0.004)})
+            variation *= np.float32(12.0)
+            variation *= (np.float32(1.0) + np.float32(0.1) * frac_lfo)
+            del frac_lfo
+            fractal_variation = variation.astype(np.float32)
+            del variation
+
+            # --- Stage 3: f_modulated ---
+            f_modulated = modulation
+            f_modulated += base_freq + np.float32(chaotic_factor * base_freq * 0.25)
+            f_modulated += fractal_variation
+            del fractal_variation, modulation
+
+            # --- Stage 4: Envelope ---
+            envelope = self.audio_processor._compute_envelope_chunk(
+                chunk_offset, chunk_samples, adsr_params, simplex_envelope, total_samples)
+
+            # --- Stage 5: LFOs ---
+            lfo_left = self.audio_processor._compute_lfo_chunk(t_chunk, lfo_left_params)
+            lfo_right = self.audio_processor._compute_lfo_chunk(t_chunk, lfo_right_params)
+
+            # --- Stage 6: Harmonics ---
+            wave_left = jit_generate_harmonics_vectorized(
+                all_frequencies, t_chunk, envelope, lfo_left, mod_depths)
+            wave_right = jit_generate_harmonics_vectorized(
+                all_frequencies, t_chunk, envelope, lfo_right, mod_depths)
+
+            # --- Stage 7: Taygetan binaural ---
+            if has_taygetan and tay_freqs:
+                binaural_waves = self.audio_processor.batch_binaural_oscillator(t_chunk, tay_freqs, stop_event)
+                wave_left += (binaural_waves[:, :, 0] * envelope * np.float32(0.015)).sum(axis=0)
+                wave_right += (binaural_waves[:, :, 1] * envelope * np.float32(0.015)).sum(axis=0)
+                del binaural_waves
+
+            del envelope, lfo_left, lfo_right
+
+            # --- Stage 8: Wave shaping ---
+            wave_left = jit_wave_shaping(wave_left, 2.5)
+            wave_right = jit_wave_shaping(wave_right, 2.5)
+
+            # --- Stage 9: Low-pass filter with zi carry ---
+            # Uses pre-computed sos_lowpass (fixed coefficients for consistent zi carry)
+            if zi_left is None:
+                wave_left, zi_left = sosfilt(sos_lowpass, wave_left, zi=np.zeros((sos_lowpass.shape[0], 2), dtype=np.float64))
+            else:
+                wave_left, zi_left = sosfilt(sos_lowpass, wave_left, zi=zi_left)
+            if zi_right is None:
+                wave_right, zi_right = sosfilt(sos_lowpass, wave_right, zi=np.zeros((sos_lowpass.shape[0], 2), dtype=np.float64))
+            else:
+                wave_right, zi_right = sosfilt(sos_lowpass, wave_right, zi=zi_right)
+
+            wave_left = wave_left.astype(np.float32)
+            wave_right = wave_right.astype(np.float32)
+
+            # --- Stage 10: Normalization (pre-computed gain) ---
+            wave_left *= norm_gain
+            wave_right *= norm_gain
+
+            # --- Stage 11: Reverb with tail carry ---
+            wave_left = reverb_left.process_chunk(wave_left)
+            wave_right_delayed = np.concatenate([delay_buffer, wave_right[:-12]])
+
+            # --- Stage 12: 12-sample right delay with carry ---
+            delay_buffer = wave_right[-12:].copy()
+            wave_right = reverb_right.process_chunk(wave_right_delayed)
+            del wave_right_delayed
+
+            # --- Stage 13: Noise layers ---
+            noise_left = self.audio_processor.evolving_noise_layer(t_chunk, stop_event=stop_event)
+            noise_right = self.audio_processor.evolving_noise_layer(
+                t_chunk + noise_offset_right, stop_event=stop_event)
+
+            wave_left += noise_left
+            del noise_left
+            wave_left *= noise_scale_left
+
+            wave_right += noise_right
+            del noise_right
+            wave_right *= noise_scale_right
+
+            # --- Stage 14: Fade in/out ---
+            if chunk_offset < fade_samples:
+                # Chunk overlaps with fade-in region
+                for i in range(chunk_samples):
+                    global_idx = chunk_offset + i
+                    if global_idx < fade_samples:
+                        fade_val = (global_idx / fade_samples) ** 1.5
+                        wave_left[i] *= fade_val
+                        wave_right[i] *= fade_val
+
+            if chunk_offset + chunk_samples > total_samples - fade_samples:
+                # Chunk overlaps with fade-out region
+                fade_out_start = total_samples - fade_samples
+                for i in range(chunk_samples):
+                    global_idx = chunk_offset + i
+                    if global_idx >= fade_out_start:
+                        fade_val = ((total_samples - global_idx) / fade_samples) ** 1.5
+                        fade_val = max(0.0, fade_val)
+                        wave_left[i] *= fade_val
+                        wave_right[i] *= fade_val
+
+            # --- Stage 15: Toroidal pan curve ---
+            theta_perturb = np.float32(0.15) * simplex_pan.generate_noise(t_chunk * np.float32(0.005), 0.0, 0.0, 0.0, 0.0)
+            phi_perturb = np.float32(0.15) * simplex_pan.generate_noise(t_chunk * np.float32(0.007), np.float32(1.0), 0.0, 0.0, 0.0)
+
+            theta = TWO_PI * torus_theta_freq * t_chunk + theta_perturb
+            phi = TWO_PI * torus_phi_freq * t_chunk + phi_perturb
+            del theta_perturb, phi_perturb
+
+            pan_curve = ((torus_R + torus_r * np.cos(phi)) * np.cos(theta) / (torus_R + torus_r)).astype(np.float32)
+            del theta, phi
+
+            # sosfilt with zi for pan curve
+            if zi_pan is None:
+                pan_curve, zi_pan = sosfilt(sos_pan, pan_curve, zi=np.zeros((sos_pan.shape[0], 2), dtype=np.float64))
+            else:
+                pan_curve, zi_pan = sosfilt(sos_pan, pan_curve, zi=zi_pan)
+
+            pan_curve = jit_pan_curve_tanh(pan_curve.astype(np.float32), 0.6, -0.8, 0.8)
+            pan_curve += drift_amplitude * np.sin(np.float32(TWO_PI) * drift_freq * t_chunk)
+
+            pan_scaled = pan_curve * np.float32(0.6)
+            del pan_curve
+            wave_left *= (np.float32(1.0) - pan_scaled)
+            wave_right *= (np.float32(1.0) + pan_scaled)
+            del pan_scaled
+
+            # Apply master volume
+            wave_left *= np.float32(self.master_volume)
+            wave_right *= np.float32(self.master_volume)
+
+            # --- Stage 16: Sacred layers ---
+            if duration > 60 or dimensional_mode:
+                from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+                mercy_f = self._sacred_executor.submit(
+                    self.audio_processor.pleroma_mercy_layer_chunk, t_chunk, duration, 7.83)
+                silent_f = self._sacred_executor.submit(
+                    self.audio_processor.silent_solfeggio_grid_chunk, t_chunk, duration)
+                dissolution_f = self._sacred_executor.submit(
+                    self.audio_processor.archon_dissolution_layer_chunk, t_chunk, duration)
+                crystalline_f = self._sacred_executor.submit(
+                    self.audio_processor.crystalline_resonance_layer_chunk, t_chunk, duration, base_freq, crystal_sequence)
+                merkaba_f = self._sacred_executor.submit(
+                    self.audio_processor.lemurian_merkaba_layer_chunk, t_chunk, duration)
+                water_f = self._sacred_executor.submit(
+                    self.audio_processor.water_element_layer_chunk, t_chunk, duration)
+
+                sacred_timeout = 60.0
+                try:
+                    mercy = mercy_f.result(timeout=sacred_timeout)
+                except Exception:
+                    mercy = np.zeros(chunk_samples, dtype=np.float32)
+                try:
+                    silent = silent_f.result(timeout=sacred_timeout)
+                except Exception:
+                    silent = np.zeros(chunk_samples, dtype=np.float32)
+                try:
+                    dissolution = dissolution_f.result(timeout=sacred_timeout)
+                except Exception:
+                    dissolution = np.zeros(chunk_samples, dtype=np.float32)
+                try:
+                    crystalline = crystalline_f.result(timeout=sacred_timeout)
+                except Exception:
+                    crystalline = np.zeros(chunk_samples, dtype=np.float32)
+                try:
+                    merkaba = merkaba_f.result(timeout=sacred_timeout)
+                except Exception:
+                    merkaba = np.zeros(chunk_samples, dtype=np.float32)
+                try:
+                    water = water_f.result(timeout=sacred_timeout)
+                except Exception:
+                    water = np.zeros(chunk_samples, dtype=np.float32)
+
+                # Toroidal panning for each sacred layer — independent spatial drift
+                for layer, st_freq, sp_freq in zip(
+                        [mercy, silent, dissolution, crystalline, merkaba, water], sacred_theta_freqs, sacred_phi_freqs):
+                    s_theta = TWO_PI * st_freq * t_chunk
+                    s_phi = TWO_PI * sp_freq * t_chunk
+                    sacred_pan = ((sacred_R + sacred_r * np.cos(s_phi)) * np.cos(s_theta) / (sacred_R + sacred_r)).astype(np.float32)
+                    sacred_pan_scaled = sacred_pan * np.float32(0.4)
+                    wave_left += layer * (np.float32(1.0) - sacred_pan_scaled)
+                    wave_right += layer * (np.float32(1.0) + sacred_pan_scaled)
+                    del sacred_pan, sacred_pan_scaled
+                del mercy, silent, dissolution, crystalline, merkaba, water
+
+            # Build stereo chunk and yield
+            stereo_chunk = np.empty((chunk_samples, 2), dtype=np.float32)
+            stereo_chunk[:, 0] = wave_left
+            stereo_chunk[:, 1] = wave_right
+            del wave_left, wave_right, t_chunk
+
+            if update_progress:
+                update_progress((chunk_idx + 1) / num_chunks)
+
+            yield stereo_chunk

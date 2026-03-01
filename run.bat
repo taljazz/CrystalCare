@@ -18,7 +18,7 @@ echo [OK] Using Python: %CONDA_PYTHON%
 echo Starting CrystalCare...
 echo.
 
-"%CONDA_PYTHON%" main.py
+"%CONDA_PYTHON%" main.py %*
 
 if errorlevel 1 (
     echo.

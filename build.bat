@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 REM CrystalCare Build Script
 REM Compiles CrystalCare into a standalone executable using Nuitka
 
@@ -122,7 +123,6 @@ echo.
   --include-package=scipy.signal ^
   --include-package=scipy.ndimage ^
   --include-package=scipy.integrate ^
-  --include-package=scipy.io ^
   --include-package=sounddevice ^
   --include-package=wx ^
   --include-data-files=%PYD_FILE%=%PYD_FILE% ^

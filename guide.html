@@ -10,6 +10,9 @@
         ul { list-style-type: disc; margin-left: 20px; }
         img { max-width: 100%; height: auto; border: 1px solid #ccc; margin: 10px 0; }
         figcaption { font-style: italic; text-align: center; margin-bottom: 20px; }
+        table { border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+        th { background-color: #f0f0f0; }
     </style>
 </head>
 <body>
@@ -17,7 +20,8 @@
 <h1>CrystalCare User Guide</h1>
 
 <h2>1. Introduction</h2>
-<p>Welcome to CrystalCare, an innovative sound healing app designed to restore balance, clear negativity, and reconnect you to your inner center through dynamic, spiral-based tones. Inspired by ancient vibrational practices and modern mathematical modeling, CrystalCare offers a natural way to alter consciousness, free up clogged energies, and access deeper states of awareness. Unlike static binaural beats or isochronic tones, CrystalCare's audio evolves with mathematical precision, creating immersive soundscapes that evoke the legendary healing harmonics of Lemuria and Atlantis. This guide covers everything you need to know about using CrystalCare, whether through the app interface or exported audio files. Whether you're seeking relaxation, energy clearing, or profound transformation, CrystalCare empowers your journey. We hope this guide helps you harness its full potential.</p>
+<p>Welcome to CrystalCare, an innovative sound healing app designed to restore balance, clear negativity, and reconnect you to your inner center through dynamic, spiral-based tones. Inspired by ancient vibrational practices and modern mathematical modeling, CrystalCare offers a natural way to alter consciousness, free up clogged energies, and access deeper states of awareness. Unlike static binaural beats or isochronic tones, CrystalCare's audio evolves with mathematical precision, creating immersive soundscapes that evoke the legendary healing harmonics of Lemuria and Atlantis.</p>
+<p>CrystalCare features seven frequency modes, six sacred healing layers that activate during extended sessions, nine crystalline resonance profiles derived from real mineral spectroscopy, and a Lemurian-inspired heart-based healing philosophy. The audio engine uses a streaming pipeline that generates sound in real time, allowing sessions of any length with minimal memory usage. This guide covers everything you need to know about using CrystalCare, whether through the app interface or exported audio files.</p>
 
 <h2>2. History of Sound Healing and Its Relation to CrystalCare</h2>
 <p>Sound healing has deep roots in human history, serving as a tool for physical, emotional, and spiritual restoration across cultures. Understanding this evolution highlights how CrystalCare bridges ancient traditions with contemporary technology.</p>
@@ -28,101 +32,171 @@
 </figure>
 
 <h3>Ancient Origins</h3>
-<p>Sound healing traces back to prehistoric times, with archaeological evidence from sites like Göbekli Tepe (c. 10,000 BCE) suggesting the use of drums and chants in rituals for healing and altered states. In ancient Egypt (c. 3000 BCE), priests employed vocal toning, sistrums, and harps to align the body's energy, believing sound could harmonize the ka (life force). Sumerians (c. 3500 BCE) used lyres for therapeutic purposes, while in ancient China (c. 2700 BCE), the Huangdi Neijing described sound as a means to balance qi.</p>
-<p>Greek philosopher Pythagoras (c. 570–495 BCE) formalized sound healing with the "music of the spheres," using mathematical ratios and instruments to heal the body and soul. Eastern traditions, such as Tibetan Buddhism (c. 8th century CE), utilized singing bowls and gongs for chakra balancing, and Indian Ayurveda (c. 1500 BCE) employed mantras and ragas for vibrational therapy. Indigenous practices, like Australian Aboriginal didgeridoo healing (over 1,500 years old) and Native American drum circles, harnessed sound for trance induction and energy clearing.</p>
+<p>Sound healing traces back to prehistoric times, with archaeological evidence from sites like G&ouml;bekli Tepe (c. 10,000 BCE) suggesting the use of drums and chants in rituals for healing and altered states. In ancient Egypt (c. 3000 BCE), priests employed vocal toning, sistrums, and harps to align the body's energy, believing sound could harmonize the ka (life force). Sumerians (c. 3500 BCE) used lyres for therapeutic purposes, while in ancient China (c. 2700 BCE), the Huangdi Neijing described sound as a means to balance qi.</p>
+<p>Greek philosopher Pythagoras (c. 570&ndash;495 BCE) formalized sound healing with the "music of the spheres," using mathematical ratios and instruments to heal the body and soul. Eastern traditions, such as Tibetan Buddhism (c. 8th century CE), utilized singing bowls and gongs for chakra balancing, and Indian Ayurveda (c. 1500 BCE) employed mantras and ragas for vibrational therapy. Indigenous practices, like Australian Aboriginal didgeridoo healing (over 1,500 years old) and Native American drum circles, harnessed sound for trance induction and energy clearing.</p>
 <p>Lemurian and Atlantean legends (esoteric lore, not historically verified) describe advanced crystal-activated sound technologies for healing and ascension. Lemuria (hypothetical Pacific civilization) and Atlantis (Plato's myth, c. 360 BCE) are said to have used harmonic frequencies and crystals to manipulate energy fields, influencing modern new age sound healing.</p>
 
 <h3>Medieval and Renaissance Developments</h3>
-<p>In the Middle Ages, Gregorian chants in European monasteries (c. 9th–10th century CE) were used for spiritual elevation and physical healing, based on modes believed to resonate with the body. The Renaissance revived Pythagorean harmonics, with Johannes Kepler (1571–1630) exploring celestial music.</p>
+<p>In the Middle Ages, Gregorian chants in European monasteries (c. 9th&ndash;10th century CE) were used for spiritual elevation and physical healing, based on modes believed to resonate with the body. The Renaissance revived Pythagorean harmonics, with Johannes Kepler (1571&ndash;1630) exploring celestial music.</p>
 
 <h3>Modern Evolution</h3>
-<p>The 19th century saw Heinrich Wilhelm Dove's discovery of binaural beats (1839), where two close frequencies create a perceived third tone in the brain for altered states. The 20th century introduced isochronic tones (Arturo Manns, 1980s) for brainwave entrainment and Solfeggio frequencies (Dr. Joseph Puleo, 1990s), ancient scales claimed to promote healing (e.g., 528 Hz for DNA repair). Cymatics studies by Hans Jenny (1967) showed sound’s ability to form patterns in matter, supporting vibrational medicine.</p>
-<p>Today, sound healing integrates ancient tools (bowls, gongs) with technology like frequency generators and apps, backed by research on sound’s effects on brainwaves (e.g., alpha/theta for relaxation) and cellular vibration (studies on ultrasound therapy).</p>
+<p>The 19th century saw Heinrich Wilhelm Dove's discovery of binaural beats (1839), where two close frequencies create a perceived third tone in the brain for altered states. The 20th century introduced isochronic tones (Arturo Manns, 1980s) for brainwave entrainment and Solfeggio frequencies (Dr. Joseph Puleo, 1990s), ancient scales claimed to promote healing (e.g., 528 Hz for DNA repair). Cymatics studies by Hans Jenny (1967) showed sound's ability to form patterns in matter, supporting vibrational medicine.</p>
+<p>Today, sound healing integrates ancient tools (bowls, gongs) with technology like frequency generators and apps, backed by research on sound's effects on brainwaves (e.g., alpha/theta for relaxation) and cellular vibration (studies on ultrasound therapy).</p>
 
 <h3>How CrystalCare Relates</h3>
-<p>CrystalCare, first conceptualized in October 2024 as an experimental app co-created with AI (ChatGPT), revives the spirit of ancient sound healing—particularly Lemurian/Atlantean crystal harmonics—while transcending modern binaural and isochronic tones. Using mathematical spirals (logarithmic for smooth growth, Rössler for chaotic depth) and golden ratio frequencies, it generates evolving soundscapes that clear energy and alter consciousness. User tests with friends and volunteers confirmed its success in centering users and freeing clogged energies. As of July 17, 2025, CrystalCare has been updated to include advanced modes, fractal noise, and 3D spatial effects, blending ancient vibrational wisdom with modern computation for profound healing.</p>
+<p>CrystalCare, first conceptualized in October 2024 as an experimental app co-created with AI, revives the spirit of ancient sound healing&mdash;particularly Lemurian crystalline healing and Gnostic sacred mathematics&mdash;while transcending modern binaural and isochronic tones. Using mathematical spirals (logarithmic for smooth growth, R&ouml;ssler for chaotic depth), golden ratio frequencies, and real crystal spectroscopy data, it generates evolving soundscapes that clear energy and alter consciousness. Its Lemurian-inspired approach emphasizes heart-based, organic, consciousness-driven healing&mdash;warmth and nurturing over mechanical precision. User tests with friends and volunteers confirmed its success in centering users and freeing clogged energies.</p>
 
 <h2>3. CrystalCare's Unique Approach</h2>
 <p>CrystalCare distinguishes itself by fusing ancient sound healing principles with advanced mathematical and audio processing:</p>
 
 <figure>
-    <img src="https://example.com/hybrid-spiral-diagram.png" alt="A diagram illustrating the hybrid logarithmic-Rössler spiral. On the left, a smooth, outward-growing logarithmic spiral resembling a seashell or galaxy arm. On the right, a chaotic Rössler attractor trajectory with irregular wobbles. In the center, a blended hybrid spiral showing smooth growth with subtle perturbations. Labels indicate 'Logarithmic Spiral (Harmony)', 'Rössler Perturbations (Chaos)', and 'Hybrid Spiral (Balance)'.">
-    <figcaption>Diagram 2: Hybrid Logarithmic-Rössler Spiral. This visual represents the mathematical foundation of CrystalCare's tones, showing how the smooth logarithmic spiral combines with chaotic Rössler perturbations for dynamic soundscapes.</figcaption>
+    <img src="https://example.com/hybrid-spiral-diagram.png" alt="A diagram illustrating the hybrid logarithmic-R&ouml;ssler spiral. On the left, a smooth, outward-growing logarithmic spiral resembling a seashell or galaxy arm. On the right, a chaotic R&ouml;ssler attractor trajectory with irregular wobbles. In the center, a blended hybrid spiral showing smooth growth with subtle perturbations. Labels indicate 'Logarithmic Spiral (Harmony)', 'R&ouml;ssler Perturbations (Chaos)', and 'Hybrid Spiral (Balance)'.">
+    <figcaption>Diagram 2: Hybrid Logarithmic-R&ouml;ssler Spiral. This visual represents the mathematical foundation of CrystalCare's tones, showing how the smooth logarithmic spiral combines with chaotic R&ouml;ssler perturbations for dynamic soundscapes.</figcaption>
 </figure>
 
 <ul>
-    <li><strong>Mathematical Spirals</strong>: The logarithmic spiral mimics natural growth patterns for harmonious tones, while the Rössler attractor adds chaotic perturbations for non-linear depth, creating a hybrid spiral that feels alive and immersive.</li>
+    <li><strong>Mathematical Spirals</strong>: The logarithmic spiral mimics natural growth patterns for harmonious tones, while the R&ouml;ssler attractor adds chaotic perturbations for non-linear depth, creating a hybrid spiral that feels alive and immersive.</li>
     <li><strong>Golden Ratio and Sacred Geometry</strong>: Frequencies incorporate the golden ratio (1.618) and sacred ratios (e.g., Metatron's Cube at 1.414), resonating with natural harmonics for energy alignment.</li>
-    <li><strong>Frequency Sets as Modes</strong>: Five selectable frequency sets cater to different needs, from grounding Solfeggio tones to cosmic activations, all generated dynamically with spatial effects.</li>
+    <li><strong>Seven Frequency Modes</strong>: Seven selectable frequency modes cater to different needs, from grounding Solfeggio tones to Taygetan binaural resonances and multidimensional journeys, all generated dynamically with spatial effects.</li>
+    <li><strong>Six Sacred Layers</strong>: Extended sessions (over 60 seconds) activate six sacred healing layers drawn from Gnostic cosmology, Solfeggio traditions, Tesla mathematics, crystal mineralogy, Lemurian Merkaba geometry, and water-element consciousness.</li>
+    <li><strong>Nine Crystal Profiles</strong>: The Crystalline Resonance Layer uses harmonic ratios derived from real Raman spectroscopy data for nine minerals, each with unique acoustic signatures. Sessions always begin with Lemurian Quartz, channeling divine feminine heart energy.</li>
+    <li><strong>Streaming Audio Engine</strong>: Audio is generated in real-time chunks, allowing sessions of unlimited length with constant low memory usage. Playback begins within a fraction of a second.</li>
     <li><strong>Hypnosis Integration</strong>: Pair with guided scripts to access the unconscious "source code" for habit rewiring, enhanced by pulsing rhythms and multiverse-like soundscapes.</li>
     <li><strong>Accessibility</strong>: Designed with blind users in mind, the app uses wxPython for screen reader compatibility (e.g., NVDA), ensuring intuitive navigation.</li>
 </ul>
 
 <h2>4. Modes and Usage</h2>
-<p>CrystalCare offers five frequency sets, each functioning as a mode for specific healing purposes. All use dynamic sound generation with evolving modulation, fractal variations, and hybrid spiral panning for 3D immersion. Play via the app or save as WAV files for offline use. Use headphones in a quiet space for optimal immersion.</p>
+<p>CrystalCare offers seven frequency modes, each designed for specific healing purposes. All use dynamic sound generation with evolving modulation, fractal variations, and hybrid spiral panning for 3D immersion. Play via the app or save as WAV files for offline use. Use headphones in a quiet space for optimal immersion.</p>
 
 <figure>
-    <img src="https://example.com/crystalcare-app-screenshot.png" alt="A screenshot of the CrystalCare app interface. At the top, a dropdown menu labeled 'Select Frequency Set' with options like 'Lower Frequencies' and 'Triple Helix DNA Activation Mode'. Below, a text field for 'Session Duration (Minutes)'. Buttons include 'Play', 'Save as WAV', 'Open Guide', 'Batch Save', and 'Stop'. A status text box at the bottom displays messages like 'Resonating...'. The layout is simple and accessible, with clear labels for screen readers.">
+    <img src="https://example.com/crystalcare-app-screenshot.png" alt="A screenshot of the CrystalCare app interface. At the top, a dropdown menu labeled 'Select Frequency Set' with seven options. Below, a text field for 'Session Duration (Minutes)'. Buttons include 'Play', 'Save as WAV', 'Open Guide', 'Batch Save', and 'Stop'. A status text box at the bottom displays messages like 'Resonating...'. The layout is simple and accessible, with clear labels for screen readers.">
     <figcaption>Diagram 3: CrystalCare App Interface. This visual shows the main screen of the app, including frequency selection, duration input, action buttons, and status display for easy navigation.</figcaption>
 </figure>
 
 <h3>4.1 General Usage</h3>
 <ol>
-    <li>Open CrystalCare and select a frequency set from the dropdown.</li>
-    <li>Enter duration (minutes, max 60) and validate (positive number).</li>
-    <li>Choose Play (real-time playback), Save as WAV (single file), or Batch Save (multiple files).</li>
+    <li>Open CrystalCare and select a frequency mode from the dropdown.</li>
+    <li>Enter duration in minutes (any positive number).</li>
+    <li>Choose Play (real-time streaming playback), Save as WAV (single file), or Batch Save (multiple files).</li>
     <li>For hypnosis, pair with a guided script and focus on intention (e.g., energy clearing).</li>
     <li>Stop ongoing operations with the Stop button.</li>
     <li>Open the Guide for help.</li>
 </ol>
+<p><strong>Session Length Recommendations:</strong> Sessions under 60 seconds produce the core tone only. Sessions of 60 seconds or longer activate all six sacred healing layers for the full CrystalCare experience. For deep healing work, sessions of 10&ndash;60 minutes are recommended.</p>
 
-<h3>4.2 Frequency Sets (Modes)</h3>
-<p>Each set uses dynamic sound generation with evolving modulation, fractal variations, and hybrid spiral panning for 3D immersion. Frequencies are selected randomly from the set for each session.</p>
+<h3>4.2 Frequency Modes</h3>
+<p>Each mode uses dynamic sound generation with evolving modulation, fractal variations, and hybrid spiral panning for 3D immersion. A base frequency is selected randomly from the mode's set for each session, ensuring every listening experience is unique.</p>
 
 <ul>
-    <li><strong>1. Lower Frequencies (174Hz, 396Hz, 417Hz, 528Hz) – Solfeggio Base</strong>: 
-        <p>Grounding tones for clearing negativity and emotional release, including 528 Hz for DNA repair.</p>
+    <li><strong>1. Lower Frequencies (174Hz, 396Hz, 417Hz, 528Hz) &ndash; Solfeggio Base</strong>:
+        <p>Grounding tones for clearing negativity and emotional release, including 528 Hz (the "Love Frequency" associated with DNA repair).</p>
         <p><strong>How It Works</strong>: Dynamic modulation with golden ratio harmonics and chaotic perturbations for rhythmic pulsing.</p>
-        <p><strong>Usage</strong>: Ideal for stress relief or daily centering. Play for 10–20 minutes, visualizing negativity dissolving.</p>
+        <p><strong>Usage</strong>: Ideal for stress relief or daily centering. Play for 10&ndash;20 minutes, visualizing negativity dissolving.</p>
     </li>
-    <li><strong>2. Higher Frequencies (852Hz, 963Hz) – Solfeggio High</strong>: 
+    <li><strong>2. Higher Frequencies (852Hz, 963Hz) &ndash; Solfeggio High</strong>:
         <p>Elevating tones for spiritual awakening and intuition.</p>
         <p><strong>How It Works</strong>: Subtle fractal noise and spatial wobbles enhance cosmic feel.</p>
-        <p><strong>Usage</strong>: For meditation or intuition boosting. Listen for 15–30 minutes, focusing on inner vision.</p>
+        <p><strong>Usage</strong>: For meditation or intuition boosting. Listen for 15&ndash;30 minutes, focusing on inner vision.</p>
     </li>
-    <li><strong>3. Atlantean Cosmic Frequencies (136.10Hz, 194.18Hz, 211.44Hz, 303Hz) – Planetary</strong>: 
-        <p>Cosmic alignments for energy harmony and planetary resonance.</p>
-        <p><strong>How It Works</strong>: Incorporates Rössler perturbations for unpredictable, multiverse-like shifts.</p>
-        <p><strong>Usage</strong>: For cosmic connection or energy clearing. Play for 20–40 minutes, imagining alignment with the universe.</p>
+    <li><strong>3. Atlantean Cosmic Frequencies (136.10Hz, 194.18Hz, 211.44Hz, 303Hz) &ndash; Planetary</strong>:
+        <p>Cosmic alignments for energy harmony and planetary resonance. These frequencies are derived from Hans Cousto's planetary octave calculations.</p>
+        <p><strong>How It Works</strong>: Incorporates R&ouml;ssler perturbations for unpredictable, multiverse-like shifts.</p>
+        <p><strong>Usage</strong>: For cosmic connection or energy clearing. Play for 20&ndash;40 minutes, imagining alignment with the universe.</p>
     </li>
-    <li><strong>4. Combined Mode (Sacred Geometry + Flower of Life)</strong>: 
+    <li><strong>4. Combined Mode (Sacred Geometry + Flower of Life)</strong>:
         <p>Blends sacred ratios (e.g., Metatron at 1.414, Flower of Life at 1.3) for holistic balance.</p>
         <p><strong>How It Works</strong>: Geometric modulation with hybrid spiral for harmonious, evolving patterns.</p>
-        <p><strong>Usage</strong>: For comprehensive healing. Listen for 30–60 minutes, visualizing sacred patterns.</p>
+        <p><strong>Usage</strong>: For comprehensive healing. Listen for 30&ndash;60 minutes, visualizing sacred patterns.</p>
     </li>
-    <li><strong>5. Triple Helix DNA Activation Mode</strong>: 
+    <li><strong>5. Triple Helix DNA Activation Mode</strong>:
         <p>DNA-inspired ratios (1.0, 1.2, 1.4) for deep activation and unconscious rewiring.</p>
         <p><strong>How It Works</strong>: Quantum interference and recursive feedback with 3D spiraling for profound immersion, evoking "branching multiverses."</p>
-        <p><strong>Usage</strong>: For hypnosis or transformation. Play for 20–30 minutes with a guided script, focusing on "your desired state."</p>
+        <p><strong>Usage</strong>: For hypnosis or transformation. Play for 20&ndash;30 minutes with a guided script, focusing on your desired state.</p>
+    </li>
+    <li><strong>6. Taygetan Resonances (DNA Activation with Binaural Sync)</strong>:
+        <p>Advanced binaural frequency pairs based on transcendental mathematical constants for deep neural synchronization and DNA activation.</p>
+        <p><strong>How It Works</strong>: Seven frequency pairs derived from fundamental constants&mdash;the square root of 2, the square root of 3, Euler's number (e), pi, phi cubed, and the golden ratio&mdash;are each split into binaural pairs with a 7.7 Hz sync beat. This creates precise left/right ear frequency differences that entrain brainwave activity. The base frequency is 432 Hz, the Lemurian keynote.</p>
+        <p><strong>Usage</strong>: Headphones are essential for this mode. Listen for 15&ndash;30 minutes in a comfortable, quiet space. Allow the binaural beats to guide your brain into deeper states. Particularly effective for meditation, lucid dreaming preparation, or deep relaxation.</p>
+    </li>
+    <li><strong>7. Dimensional Journey (1D&ndash;9D Realignment)</strong>:
+        <p>A multidimensional sonic journey that cycles through nine frequency dimensions, each representing a level of consciousness from physical grounding (1D) through cosmic unity (9D).</p>
+        <p><strong>How It Works</strong>: The session progresses through dimensional frequency sets, with smooth transitions between each dimension. Each dimension uses its own modulation patterns and sacred geometry ratios. The sacred healing layers activate regardless of session length in this mode, providing the full healing experience even in shorter sessions.</p>
+        <p><strong>Usage</strong>: For profound transformation and expanded awareness. Play for 20&ndash;60 minutes. Allow the dimensional progression to carry you through successive levels of consciousness. Best experienced lying down with eyes closed.</p>
     </li>
 </ul>
 
-<h2>5. Benefits and Tips</h2>
+<h2>5. Sacred Healing Layers</h2>
+<p>For sessions longer than 60 seconds (or any length in Dimensional Journey mode), CrystalCare activates six sacred healing layers that blend beneath the primary tone. These layers are sub-perceptual&mdash;you may not consciously hear them as separate elements, but they contribute to the depth and healing quality of the overall soundscape. Each layer has its own gentle fade-in/fade-out and breath modulation for organic, living movement.</p>
+
+<h3>5.1 Pleroma Mercy Layer</h3>
+<p>Channels healing frequencies from the Pleroma (the Gnostic "divine fullness") downward through a 13-step Aeonic ladder. The ladder begins at Earth's Schumann resonance (7.83 Hz) and ascends by successive golden ratio (PHI) multiplications, creating a harmonic bridge from Earth's electromagnetic heartbeat to higher spiritual frequencies. An Ogdoad gateway frequency (62.64 Hz) marks the threshold between the seven Archon-ruled planetary spheres and the realm of divine light. Seven Archon mercy frequencies offer healing to each planetary sphere through golden-ratio amplitude scaling.</p>
+
+<h3>5.2 Silent Solfeggio Grid</h3>
+<p>Combines the ancient 12-tone Solfeggio scale (174 Hz through 1296 Hz) with Tesla's 3-6-9 vortex mathematics. Nine vortex frequencies at 111 Hz intervals (111, 222, 333, 444, 555, 666, 777, 888, 999 Hz) interweave with the Solfeggio tones, honoring Tesla's insight: "If you knew the magnificence of 3, 6, and 9, you would have the key to the universe." Fibonacci-inspired amplitude modulation adds organic breathing to the grid.</p>
+
+<h3>5.3 Archon Dissolution Layer</h3>
+<p>Targeted mercy frequencies for each of the seven Archonic spheres from Gnostic cosmology, offering transformation through love rather than opposition. Each Archon is associated with a celestial body (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn) with frequencies derived from Hans Cousto's planetary calculations. For each Archon, three waves are generated: Acknowledge (the planetary frequency itself), Elevate (a PHI harmonic above, directing energy toward the Pleroma), and Ground (the nearest Schumann harmonic, anchoring in Earth's truth).</p>
+
+<h3>5.4 Crystalline Resonance Layer</h3>
+<p>The Crystalline Resonance Layer generates harmonic profiles based on real mineral data from Raman spectroscopy. Nine crystal profiles are available, each with unique acoustic characteristics derived from their crystallographic structure:</p>
+
+<table>
+    <tr><th>Crystal</th><th>Character</th></tr>
+    <tr><td>Lemurian Quartz</td><td>Warm, heart-centered. 12 harmonics with 3 heart chakra bridge frequencies (528/432 Love ratio, 594/432 Heart resonance, PHI Golden heart). Gentle shimmer and subtle organic detuning embody the divine feminine principle. Always plays first in every session.</td></tr>
+    <tr><td>Clear Quartz</td><td>Pure, precise. 9 harmonics from quartz Raman spectroscopy. The master healer&mdash;clean and amplifying.</td></tr>
+    <tr><td>Amethyst</td><td>Quartz base with organic pitch drift for a meditative, dreamy quality.</td></tr>
+    <tr><td>Rose Quartz</td><td>Extended quartz harmonics with additional upper partials for a softer, loving tone.</td></tr>
+    <tr><td>Citrine</td><td>Quartz base with moderate detuning for a warm, solar energy character.</td></tr>
+    <tr><td>Black Tourmaline</td><td>Tourmaline crystal structure with beating harmonic pairs for a protective, grounding pulse.</td></tr>
+    <tr><td>Selenite</td><td>Monoclinic crystal system (symmetry-2) with subtle beating. Ethereal and high-vibration.</td></tr>
+    <tr><td>Lapis Lazuli</td><td>Composite mineral (lazurite, calcite, pyrite) with custom mineral weights blending three crystal signatures.</td></tr>
+    <tr><td>Crystal Singing Bowl</td><td>Wide harmonic spacing (1.0, 2.828, 5.424, 9.130) with gentle beat modulation, evoking a physical singing bowl.</td></tr>
+</table>
+
+<p>During a session, crystals crossfade into one another using golden-ratio-timed transitions. Shorter sessions feature 2&ndash;3 crystals; longer sessions cycle through more of the collection. Every session begins with Lemurian Quartz, ensuring the listener always starts in the warm embrace of divine feminine heart energy before the crystalline journey unfolds.</p>
+
+<h3>5.5 Lemurian Merkaba Layer</h3>
+<p>Creates a Sonic Merkaba&mdash;a diamond-shaped energy field built from the Lemurian Frequency Quartet:</p>
 <ul>
-    <li><strong>Benefits</strong>: CrystalCare clears negativity, restores center, and unlocks unconscious potential, as user tests show. It relates to ancient sound healing by reviving harmonic vibrations and modern techniques through dynamic, spiral-based tones.</li>
+    <li><strong>324 Hz</strong> (3/4 of 432) &ndash; Foundation / Earth</li>
+    <li><strong>432 Hz</strong> (keynote) &ndash; Heart / Center</li>
+    <li><strong>540 Hz</strong> (5/4 of 432) &ndash; Expression / Spirit</li>
+    <li><strong>698.4 Hz</strong> (PHI &times; 432) &ndash; Transcendence / PHI gateway</li>
+</ul>
+<p>These four frequencies are based on the Pythagorean 3:4:5 right triangle plus the golden ratio, sounded together to create a harmonic field. Amplitudes are weighted by PHI for sacred proportion. A 0.1 Hz heart coherence breath modulation (10-second cycle) gently pulses the layer, encouraging the listener's heart rhythm to synchronize to a coherent state&mdash;directly addressing the Lemurian principle of heart-based crystal activation. This is based on HeartMath Institute research documenting heart coherence at approximately 0.1 Hz.</p>
+
+<h3>5.6 Water Element Layer</h3>
+<p>Inspired by the Lemurian relationship with water as a conscious, living entity. Marcel Vogel noted that ice and quartz share molecular structure parallels, and Lemurian seed crystals are said to "sing when held under water." This layer implements a seven-source hexagonal ripple field with a lemniscate (figure-eight) observer path, creating spatial wave interference patterns rather than simple sine stacking. Tidal simplex modulation and standing wave resonance give the layer an organic, fluid quality that represents the water element central to Lemurian crystal-water synergy.</p>
+
+<h2>6. The Lemurian Healing Philosophy</h2>
+<p>CrystalCare's design is guided by the distinction between Lemurian and Atlantean approaches to crystal healing technology. Where Atlantean methods are characterized as mind-based, mechanical, and power-driven, the Lemurian approach is heart-based, organic, and consciousness-driven. CrystalCare embraces the Lemurian path.</p>
+<p>This philosophy manifests throughout the application:</p>
+<ul>
+    <li><strong>432 Hz as the Lemurian Keynote</strong>: Known as the "natural tuning frequency of the universe" and associated with the Seed of Life sacred geometry pattern, 432 Hz serves as the central organizing frequency. It is the base frequency for Taygetan Resonances and the heart of the Sonic Merkaba.</li>
+    <li><strong>Heart Chakra Emphasis</strong>: The Lemurian Quartz crystal profile emphasizes the heart chakra frequency range (500&ndash;700 Hz at 432 Hz base) with three dedicated bridge frequencies&mdash;the Love Frequency ratio (528/432), Heart resonance (594/432), and the Golden heart (PHI &times; 432).</li>
+    <li><strong>Divine Feminine Warmth</strong>: Lemurian healing is strongly associated with divine feminine energy&mdash;warmth, nurturing, and deep feminine presence. The Lemurian Quartz profile embodies this through warmer harmonic weighting (lower harmonics emphasized, upper partials gently rolled off), softer shimmer, and subtle organic detuning that gives the tone a living, breathing quality.</li>
+    <li><strong>Heart Coherence</strong>: The 0.1 Hz breath modulation in the Merkaba layer entrains the listener's heart rhythm toward coherence, honoring the Lemurian principle that crystal healing is activated through the heart.</li>
+    <li><strong>Water Consciousness</strong>: The Water Element layer honors the Lemurian understanding of water as a conscious partner in healing, using spatial wave interference to create fluid, organic sonic textures.</li>
+</ul>
+
+<h2>7. Benefits and Tips</h2>
+<ul>
+    <li><strong>Benefits</strong>: CrystalCare clears negativity, restores center, and unlocks unconscious potential. It revives ancient vibrational wisdom through dynamic, mathematically evolved tones enhanced by crystalline resonance and sacred healing layers.</li>
     <li><strong>Tips</strong>:
         <ul>
-            <li>Use headphones for full 3D immersion.</li>
-            <li>Set intentions before sessions (e.g., "clear my habits").</li>
+            <li>Use headphones for full 3D immersion (essential for Taygetan Resonances mode).</li>
+            <li>Set intentions before sessions (e.g., "clear my habits," "open my heart").</li>
+            <li>For the full healing experience, use sessions of at least 2 minutes to activate all six sacred layers.</li>
             <li>Combine with breathwork or visualization for deeper effects.</li>
             <li>For hypnosis, pair with guided scripts to access the "source code" for rewiring.</li>
-            <li>Batch save for offline use; guide available for assistance.</li>
+            <li>Batch save for offline use; the Guide button provides in-app assistance.</li>
+            <li>Sessions of any length are supported&mdash;the streaming engine generates audio in real time with minimal memory usage.</li>
         </ul>
     </li>
 </ul>
 
-<h2>6. Conclusion</h2>
-<p>CrystalCare is more than an app—it's a bridge to ancient sound healing and modern innovation, helping you reconnect with your true self. As of July 17, 2025, CrystalCare continues to evolve, empowering users on their journey. Remember the wisdom of the tree of existence: harmony in chaos, growth in surrender. Thank you for choosing CrystalCare; may it guide you to profound transformation.</p>
+<h2>8. Conclusion</h2>
+<p>CrystalCare is more than an app&mdash;it's a bridge to ancient sound healing and modern innovation, channeling the heart-based wisdom of Lemuria through crystalline resonance, sacred mathematics, and divine feminine warmth. Every session begins in the embrace of Lemurian Quartz heart energy and unfolds through layers of Gnostic healing, Tesla vortex mathematics, Archon mercy, crystal mineralogy, Merkaba geometry, and water consciousness. Thank you for choosing CrystalCare; may it guide you to profound transformation.</p>
 
 </body>
 </html>

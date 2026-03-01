@@ -28,6 +28,11 @@ reserve/
 CLAUDE.md
 conda.md
 
+# Research/notes
+lemurian-research.txt
+lemurian-enhancements.txt
+streaming-alignment.txt
+
 # Debug/temp files
 nul
 

@@ -197,7 +197,7 @@ class CrystalCareFrame(wx.Frame):
                 base_freq = np.random.choice(frequencies) if frequencies and not isinstance(frequencies[0], tuple) else np.random.choice([pair[0] for pair in frequencies]) if frequencies else 432  # Handle binaural
             logging.debug(f"Selected base frequency for Play: {base_freq}")
             self.update_status("Resonating...")
-            self.toggle_controls(show_stop=True)
+            self.toggle_controls(show_stop=True, show_gauge=False)
             self.stop_event.clear()
             def on_complete() -> None:
                 if self._is_closing:
@@ -212,14 +212,13 @@ class CrystalCareFrame(wx.Frame):
             # Thread-safe thread creation and tracking
             with self._thread_lock:
                 self.current_thread = threading.Thread(
-                    target=self.sound_player.play_sound,
+                    target=self.sound_player.play_sound_stream,
                     args=(duration_seconds, base_freq),
                     kwargs={
                         'sample_rate': 48000,
                         'stop_event': self.stop_event,
                         'update_status': self.update_status,
                         'on_complete': on_complete,
-                        'progress_gauge': self.gauge,
                         'dimensional_mode': freq_selection == 6
                     },
                     daemon=True,  # Keep daemon for cleanup on unexpected exit
@@ -411,7 +410,7 @@ class CrystalCareFrame(wx.Frame):
         self.sound_generator.shutdown()
         self.Destroy()  # Close the window
 
-    def toggle_controls(self, show_stop: bool) -> None:
+    def toggle_controls(self, show_stop: bool, show_gauge: bool = True) -> None:
         if show_stop:
             self.freq_choice.Hide()
             self.duration_text.Hide()
@@ -420,8 +419,11 @@ class CrystalCareFrame(wx.Frame):
             self.guide_btn.Hide()
             self.batch_save_btn.Hide()
             self.stop_btn.Show()
-            self.gauge.SetValue(0)  # Reset before showing
-            self.gauge.Show()
+            if show_gauge:
+                self.gauge.SetValue(0)  # Reset before showing
+                self.gauge.Show()
+            else:
+                self.gauge.Hide()
         else:
             self.freq_choice.Show()
             self.duration_text.Show()
