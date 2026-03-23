@@ -84,8 +84,11 @@ class SoundPlayer:
             if update_status:
                 update_status(f"Playback error: {e}")
         finally:
-            if on_complete:
-                on_complete()
+            try:
+                if on_complete:
+                    on_complete()
+            except Exception as e:
+                logging.exception(f"Error in on_complete callback: {e}")
 
     def play_sound_stream(self, duration: float, base_freq: float, sample_rate: int = 48000,
                           stop_event: Optional[threading.Event] = None,
@@ -108,7 +111,7 @@ class SoundPlayer:
                 dimensional_mode=dimensional_mode
             )
 
-            chunk_queue = queue.Queue(maxsize=2)
+            chunk_queue = queue.Queue(maxsize=4)
             producer_error = [None]  # Mutable container for error propagation
 
             def producer():
@@ -126,13 +129,18 @@ class SoundPlayer:
                                 break
                             except queue.Full:
                                 continue
-                    chunk_queue.put(None, timeout=1.0)  # Sentinel
                 except Exception as e:
                     producer_error[0] = e
-                    try:
-                        chunk_queue.put(None, timeout=1.0)
-                    except queue.Full:
-                        pass
+                finally:
+                    # Always send sentinel — retry until queue has space or stop requested
+                    while True:
+                        if stop_event and stop_event.is_set():
+                            break
+                        try:
+                            chunk_queue.put(None, timeout=0.5)
+                            break
+                        except queue.Full:
+                            continue
 
             producer_thread = threading.Thread(target=producer, daemon=True, name="CrystalCare-StreamProducer")
             producer_thread.start()
@@ -203,7 +211,12 @@ class SoundPlayer:
 
             gc.collect()
 
-            if was_stopped:
+            # Check if producer encountered an error
+            if producer_error[0] is not None:
+                logging.error(f"Producer error during streaming: {producer_error[0]}")
+                if update_status:
+                    update_status(f"Audio generation error: {producer_error[0]}")
+            elif was_stopped:
                 if update_status:
                     update_status("Playback stopped manually.")
             else:
@@ -215,8 +228,11 @@ class SoundPlayer:
             if update_status:
                 update_status(f"Playback error: {e}")
         finally:
-            if on_complete:
-                on_complete()
+            try:
+                if on_complete:
+                    on_complete()
+            except Exception as e:
+                logging.exception(f"Error in on_complete callback: {e}")
 
     def save_to_wav(self, duration: float, base_freq: float, filename: str, sample_rate: int = 48000,
                     stop_event: Optional[threading.Event] = None,
@@ -280,8 +296,11 @@ class SoundPlayer:
             if update_status:
                 update_status(f"Error: {e}")
         finally:
-            if on_complete:
-                on_complete()
+            try:
+                if on_complete:
+                    on_complete()
+            except Exception as e:
+                logging.exception(f"Error in on_complete callback: {e}")
 
     def batch_save(self, duration: float, base_freqs: List[float], save_dir: str, num_tones: int,
                    sample_rate: int = 48000,
@@ -386,8 +405,11 @@ class SoundPlayer:
             if update_status:
                 update_status(f"Batch save error: {e}")
         finally:
-            if on_complete:
-                on_complete()
+            try:
+                if on_complete:
+                    on_complete()
+            except Exception as e:
+                logging.exception(f"Error in on_complete callback: {e}")
 
     def stop_playback(self) -> None:
         try:

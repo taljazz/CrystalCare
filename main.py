@@ -145,7 +145,7 @@ class CrystalCareFrame(wx.Frame):
         self.guide_btn.SetToolTip("Open the CrystalCare user guide for assistance.")
         self.stop_btn = wx.Button(self.panel, label="Stop")
         self.stop_btn.SetToolTip("Stop the ongoing operation.")
-        self.stop_btn.Hide()
+        self.stop_btn.Enable(False)
         self.batch_save_btn = wx.Button(self.panel, label="Batch Save")
         self.batch_save_btn.SetToolTip("Generate and save multiple tones in a selected folder.")
         btn_sizer.Add(self.play_btn, flag=wx.ALL, border=5)
@@ -408,36 +408,47 @@ class CrystalCareFrame(wx.Frame):
             self._thread_timer.Stop()
         # Shut down shared sacred layer thread pool
         self.sound_generator.shutdown()
+        # Process pending wx events so queued wx.CallAfter calls run _is_closing guards
+        try:
+            wx.SafeYield()
+        except Exception:
+            pass
         self.Destroy()  # Close the window
 
     def toggle_controls(self, show_stop: bool, show_gauge: bool = True) -> None:
+        """Toggle controls between idle and active states using enable/disable
+        for screen reader accessibility (screen readers reliably announce
+        enabled/disabled state changes)."""
+        is_idle = not show_stop
+        # Main controls: enabled when idle, disabled when active
+        self.freq_choice.Enable(is_idle)
+        self.duration_text.Enable(is_idle)
+        self.play_btn.Enable(is_idle)
+        self.save_btn.Enable(is_idle)
+        self.guide_btn.Enable(is_idle)
+        self.batch_save_btn.Enable(is_idle)
+        # Stop button: enabled when active, disabled when idle
+        self.stop_btn.Enable(show_stop)
+        # Show/hide stop button (screen reader still announces disabled buttons)
         if show_stop:
-            self.freq_choice.Hide()
-            self.duration_text.Hide()
-            self.play_btn.Hide()
-            self.save_btn.Hide()
-            self.guide_btn.Hide()
-            self.batch_save_btn.Hide()
             self.stop_btn.Show()
-            if show_gauge:
-                self.gauge.SetValue(0)  # Reset before showing
-                self.gauge.Show()
-            else:
-                self.gauge.Hide()
         else:
-            self.freq_choice.Show()
-            self.duration_text.Show()
-            self.play_btn.Show()
-            self.save_btn.Show()
-            self.guide_btn.Show()
-            self.batch_save_btn.Show()
             self.stop_btn.Hide()
+        # Gauge
+        if show_stop and show_gauge:
+            self.gauge.SetValue(0)
+            self.gauge.Show()
+        else:
             self.gauge.Hide()
             self.gauge.SetValue(0)
-        # Force layout update and refresh on both panel and frame
         self.panel.Layout()
         self.Layout()
         self.Refresh()
+        # Move focus to the appropriate control so screen reader announces it
+        if show_stop:
+            self.stop_btn.SetFocus()
+        else:
+            self.play_btn.SetFocus()
 
     def on_open_guide(self, event) -> None:
         self.user_guide_manager.open_guide(update_status=self.update_status)

@@ -23,32 +23,32 @@ def jit_cross_modulate_wave(base_freq: float, mod_freq: float, t: np.ndarray,
                             mod_depth: float) -> np.ndarray:
     """JIT-compiled cross-modulation wave generation (float32 native)."""
     mod_signal = np.sin(TWO_PI * mod_freq * t) * mod_depth
-    return np.sin(TWO_PI * base_freq * t + mod_signal).astype(np.float32)
+    return np.sin(TWO_PI * base_freq * t + mod_signal)
 
 @njit(fastmath=True, cache=True)
 def jit_wave_shaping(signal: np.ndarray, shape_factor: float) -> np.ndarray:
     """JIT-compiled wave shaping with tanh (float32 native)."""
     clipped = np.clip(signal, np.float32(-1.0), np.float32(1.0))
-    return (np.tanh(shape_factor * clipped) * np.float32(1.2)).astype(np.float32)
+    return np.tanh(shape_factor * clipped) * np.float32(1.2)
 
 @njit(fastmath=True, cache=True)
 def jit_normalize_signal(signal: np.ndarray, scale_factor: float) -> np.ndarray:
     """JIT-compiled signal normalization."""
     max_val = np.max(np.abs(signal))
     if max_val > 0:
-        return (signal / (max_val * np.float32(scale_factor))).astype(np.float32)
+        return signal / (max_val * np.float32(scale_factor))
     return signal
 
 @njit(fastmath=True, cache=True)
 def jit_exponential_decay(length: int, decay_rate: float) -> np.ndarray:
     """JIT-compiled exponential decay for reverb IR (float32 native)."""
-    return np.exp(-np.linspace(np.float32(0), np.float32(decay_rate * 1.8), length)).astype(np.float32)
+    return np.exp(-np.linspace(np.float32(0), np.float32(decay_rate * 1.8), length))
 
 @njit(fastmath=True, cache=True)
 def jit_pan_curve_tanh(pan_curve: np.ndarray, scale: float,
                        clip_min: float, clip_max: float) -> np.ndarray:
     """JIT-compiled pan curve processing (float32 native)."""
-    return np.clip(np.tanh(pan_curve * scale), clip_min, clip_max).astype(np.float32)
+    return np.clip(np.tanh(pan_curve * scale), clip_min, clip_max)
 
 @njit(fastmath=True, cache=True, parallel=True)
 def jit_generate_harmonics_vectorized(frequencies: np.ndarray, t: np.ndarray,
@@ -109,7 +109,7 @@ def jit_quantum_harmonic(t: np.ndarray, base_freq: float,
     wave3 = np.sin(TWO_PI * f3 * t + gamma)
     wave4 = np.sin(TWO_PI * f4 * t + gamma * np.float32(0.7))
 
-    return ((wave1 + wave2 + wave3 + wave4) / np.float32(3.8) + np.float32(0.15) * np.sin(TWO_PI * np.float32(7.83) * t)).astype(np.float32)
+    return (wave1 + wave2 + wave3 + wave4) / np.float32(3.8) + np.float32(0.15) * np.sin(TWO_PI * np.float32(7.83) * t)
 
 class AudioProcessor:
     """
@@ -210,9 +210,11 @@ class AudioProcessor:
 
         # Reverb impulse response cache (keyed by reverb_length)
         self._ir_cache = {}
+        self._ir_cache_lock = threading.Lock()
 
         # Rössler trajectory cache (keyed by time array characteristics)
         self._rossler_cache = {}
+        self._rossler_cache_lock = threading.Lock()
 
         # Crystal profiles for crystalline resonance layer
         self._crystal_profiles = self._build_crystal_profiles()
@@ -432,8 +434,8 @@ class AudioProcessor:
         nyquist = 0.5 * sample_rate
         # Intentionally not using _get_filter() here: the random cutoff variation
         # produces a different normalized_cutoff each call, defeating caching.
-        cutoff_variation = np.random.uniform(-25, 25)  # ±25 Hz variation
-        normalized_cutoff = np.clip((cutoff + cutoff_variation) / nyquist, 0.1, 0.99)
+        cutoff_variation = np.float32(np.random.uniform(-25, 25))  # ±25 Hz variation
+        normalized_cutoff = np.clip((cutoff + cutoff_variation) / nyquist, np.float32(0.1), np.float32(0.99))
         b, a = butter(order, normalized_cutoff, btype='low', analog=False)
         return lfilter(b, a, signal).astype(np.float32)
     def exponential_fade(self, segment: np.ndarray, fade_length: int) -> np.ndarray:
@@ -461,7 +463,7 @@ class AudioProcessor:
         fib_ratios = np.array([1.618, 2.618, 4.236, 6.854, 11.090, 17.944], dtype=np.float32)
         chaos = chaotic_selector.next_value() if chaotic_selector else 0.5
         base_scale = 6.0 + chaos * 0.5
-        attack, decay, sustain, release = np.random.choice(fib_ratios, 4) / base_scale
+        attack, decay, sustain, release = (np.random.choice(fib_ratios, 4) / np.float32(base_scale)).astype(np.float32)
         total_samples = t.size
         envelope = np.empty(total_samples, dtype=np.float32)
        
@@ -488,17 +490,17 @@ class AudioProcessor:
 
         decay_curve = np.linspace(1, sustain, d_samples, dtype=np.float32) ** 1.2
         decay_wobble = np.float32(np.random.uniform(0.015, 0.035)) * np.sin(np.linspace(0, np.float32(np.pi * (1 + chaos * 0.3)), d_samples, dtype=np.float32))
-        envelope[a_samples:a_samples+d_samples] = np.clip(decay_curve + decay_wobble + full_noise[a_samples:a_samples+d_samples] * np.float32(0.03), sustain, 1)
+        envelope[a_samples:a_samples+d_samples] = np.clip(decay_curve + decay_wobble + full_noise[a_samples:a_samples+d_samples] * np.float32(0.03), sustain, np.float32(1.0))
         del decay_curve, decay_wobble
 
         sustain_curve = np.full(s_samples, sustain, dtype=np.float32)
         sustain_wobble = np.float32(np.random.uniform(0.01, 0.025)) * np.sin(TWO_PI * np.linspace(0, np.float32(1.5 + chaos * 0.5), s_samples, dtype=np.float32))
-        envelope[a_samples+d_samples:a_samples+d_samples+s_samples] = np.clip(sustain_curve + sustain_wobble + full_noise[a_samples+d_samples:a_samples+d_samples+s_samples] * np.float32(0.04), sustain * 0.8, 1)
+        envelope[a_samples+d_samples:a_samples+d_samples+s_samples] = np.clip(sustain_curve + sustain_wobble + full_noise[a_samples+d_samples:a_samples+d_samples+s_samples] * np.float32(0.04), sustain * np.float32(0.8), np.float32(1.0))
         del sustain_curve, sustain_wobble
 
         if r_samples > 0:
             release_curve = np.linspace(sustain, 0, r_samples, dtype=np.float32) ** 1.5
-            envelope[-r_samples:] = np.clip(release_curve + full_noise[-r_samples:] * np.float32(0.05), 0, sustain)
+            envelope[-r_samples:] = np.clip(release_curve + full_noise[-r_samples:] * np.float32(0.05), np.float32(0.0), sustain)
             del release_curve
         del full_noise
 
@@ -509,12 +511,12 @@ class AudioProcessor:
         if stop_event and stop_event.is_set():
             logging.debug("Dynamic cross modulation stopped early due to stop_event.")
             return np.zeros_like(t, dtype=np.float32)
-        mod_depth = np.random.uniform(0.15, 0.35)
+        mod_depth = np.float32(np.random.uniform(0.15, 0.35))
         return jit_cross_modulate_wave(base_freq, mod_freq, t, mod_depth)  # Already float32
     def microtonal_lfo(self, t: np.ndarray, base_frequency: float,
                        stop_event: Optional[threading.Event] = None) -> np.ndarray:
-        lfo1 = base_frequency * (PHI ** np.random.uniform(-0.05, 0.05))
-        lfo2 = lfo1 * np.random.uniform(0.99, 1.01)
+        lfo1 = base_frequency * np.float32(PHI ** np.random.uniform(-0.05, 0.05))
+        lfo2 = lfo1 * np.float32(np.random.uniform(0.99, 1.01))
         depth = np.float32(np.random.uniform(0.002, 0.006))
         drift = np.float32(0.01) * np.sin(np.float32(0.1 * np.pi) * t)
         inner_mod = np.float32(0.3) * np.sin(TWO_PI * np.float32(lfo2) * t)
@@ -530,11 +532,13 @@ class AudioProcessor:
         num_lfos = len(base_frequencies)
         num_samples = len(t)
 
-        # Pre-generate all random values at once (float32)
-        phi_powers = np.float32(PHI) ** np.random.uniform(-0.05, 0.05, num_lfos).astype(np.float32)
-        lfo1_freqs = (base_frequencies * phi_powers).astype(np.float32)
-        lfo2_freqs = (lfo1_freqs * np.random.uniform(0.99, 1.01, num_lfos).astype(np.float32))
-        depths = np.random.uniform(0.002, 0.006, num_lfos).astype(np.float32)
+        # Pre-generate all random values in a single batch (float32)
+        rng_batch = np.random.uniform(0, 1, (3, num_lfos)).astype(np.float32)
+        phi_powers = np.float32(PHI) ** (rng_batch[0] * np.float32(0.1) - np.float32(0.05))  # [-0.05, 0.05]
+        lfo1_freqs = base_frequencies * phi_powers
+        lfo2_freqs = lfo1_freqs * (rng_batch[1] * np.float32(0.02) + np.float32(0.99))  # [0.99, 1.01]
+        depths = rng_batch[2] * np.float32(0.004) + np.float32(0.002)  # [0.002, 0.006]
+        del rng_batch
 
         # Compute drift once (shared across all LFOs, float32)
         drift = np.float32(0.01) * np.sin(np.float32(0.1 * np.pi) * t)
@@ -559,17 +563,19 @@ class AudioProcessor:
         decay = 0.75  # Softer for Pleiadian gentleness
         reverb_length = min(signal.size // 2, int(sample_rate * 2.618))  # Longer tails, golden ratio
 
-        # Use cached IR if available for this length
-        if reverb_length not in self._ir_cache:
-            if len(self._ir_cache) > 10:
-                self._ir_cache.clear()
-            # Compute and cache the impulse response
-            ir = jit_exponential_decay(reverb_length, decay)  # Already float32
-            ir += 0.08 * np.sin(np.linspace(0, TWO_PI * PHI, reverb_length, dtype=np.float32))
-            ir /= np.max(np.abs(ir))
-            self._ir_cache[reverb_length] = ir
+        # Use cached IR if available for this length (thread-safe)
+        with self._ir_cache_lock:
+            if reverb_length not in self._ir_cache:
+                if len(self._ir_cache) > 10:
+                    self._ir_cache.clear()
+                # Compute and cache the impulse response
+                ir = jit_exponential_decay(reverb_length, decay)  # Already float32
+                ir += 0.08 * np.sin(np.linspace(0, TWO_PI * PHI, reverb_length, dtype=np.float32))
+                ir /= np.max(np.abs(ir))
+                self._ir_cache[reverb_length] = ir
+            ir_cached = self._ir_cache[reverb_length]
 
-        reverb_signal = fftconvolve(signal, self._ir_cache[reverb_length], mode='full')[:signal.size]
+        reverb_signal = fftconvolve(signal, ir_cached, mode='full')[:signal.size]
         return reverb_signal.astype(np.float32)
     def evolving_noise_layer(self, t: np.ndarray, noise_level: float = 0.003,
                              stop_event: Optional[threading.Event] = None) -> np.ndarray:
@@ -603,23 +609,23 @@ class AudioProcessor:
         # Cache key based on time array characteristics (deterministic for same duration)
         cache_key = (len(t), round(float(t[-1]), 6) if len(t) > 0 else 0.0)
 
-        if cache_key not in self._rossler_cache:
-            if len(self._rossler_cache) > 5:
-                self._rossler_cache.clear()
-            # Integrate Rössler equations and cache normalized result (float32)
-            t_scaled = t * np.float32(0.1)
-            initial_state = [1.0, 1.0, 1.0]
-            trajectory = odeint(rossler, initial_state, t_scaled)
-            del t_scaled
-            x, y, z = trajectory.T
-            del trajectory
-            self._rossler_cache[cache_key] = (
-                (x / np.max(np.abs(x))).astype(np.float32),
-                (y / np.max(np.abs(y))).astype(np.float32),
-                (z / np.max(np.abs(z))).astype(np.float32)
-            )
-
-        x_rossler, y_rossler, z_rossler = self._rossler_cache[cache_key]
+        with self._rossler_cache_lock:
+            if cache_key not in self._rossler_cache:
+                if len(self._rossler_cache) > 5:
+                    self._rossler_cache.clear()
+                # Integrate Rössler equations and cache normalized result (float32)
+                t_scaled = t * np.float32(0.1)
+                initial_state = [1.0, 1.0, 1.0]
+                trajectory = odeint(rossler, initial_state, t_scaled)
+                del t_scaled
+                x, y, z = trajectory.T
+                del trajectory
+                self._rossler_cache[cache_key] = (
+                    (x / np.max(np.abs(x))).astype(np.float32),
+                    (y / np.max(np.abs(y))).astype(np.float32),
+                    (z / np.max(np.abs(z))).astype(np.float32)
+                )
+            x_rossler, y_rossler, z_rossler = self._rossler_cache[cache_key]
         # Logarithmic spiral parameters (float32 throughout)
         theta = np.float32(0.002) * t
         phi_angle = np.float32(0.001) * t
@@ -1309,30 +1315,40 @@ class AudioProcessor:
         chaos = adsr_params['chaos']
         overall_scale = adsr_params['overall_scale']
 
+        # Vectorized ADSR — compute all phases with masks instead of per-sample loop
+        global_indices = np.arange(chunk_offset, chunk_offset + chunk_samples, dtype=np.float32)
         envelope = np.empty(chunk_samples, dtype=np.float32)
 
-        for i in range(chunk_samples):
-            global_idx = chunk_offset + i
-            if global_idx < a_samples:
-                # Attack phase
-                t_norm = global_idx / max(a_samples, 1)
-                envelope[i] = t_norm ** 1.5
-            elif global_idx < a_samples + d_samples:
-                # Decay phase
-                t_norm = (global_idx - a_samples) / max(d_samples, 1)
-                envelope[i] = 1.0 - (1.0 - sustain) * (t_norm ** 1.2)
-            elif global_idx < a_samples + d_samples + s_samples:
-                # Sustain phase
-                t_norm = (global_idx - a_samples - d_samples) / max(s_samples, 1)
-                wobble = np.float32(0.02) * np.sin(np.float32(TWO_PI * 1.5) * t_norm)
-                envelope[i] = sustain + wobble
-            else:
-                # Release phase
-                release_idx = global_idx - (a_samples + d_samples + s_samples)
-                t_norm = release_idx / max(r_samples, 1)
-                envelope[i] = sustain * (1.0 - t_norm) ** 1.5
+        ad_boundary = a_samples + d_samples
+        ads_boundary = ad_boundary + s_samples
 
-        envelope = np.clip(envelope, 0, 1).astype(np.float32)
+        # Attack phase
+        attack_mask = global_indices < a_samples
+        if np.any(attack_mask):
+            t_norm = global_indices[attack_mask] / max(a_samples, 1)
+            envelope[attack_mask] = t_norm ** 1.5
+
+        # Decay phase
+        decay_mask = (global_indices >= a_samples) & (global_indices < ad_boundary)
+        if np.any(decay_mask):
+            t_norm = (global_indices[decay_mask] - a_samples) / max(d_samples, 1)
+            envelope[decay_mask] = np.float32(1.0) - (np.float32(1.0) - sustain) * (t_norm ** 1.2)
+
+        # Sustain phase
+        sustain_mask = (global_indices >= ad_boundary) & (global_indices < ads_boundary)
+        if np.any(sustain_mask):
+            t_norm = (global_indices[sustain_mask] - ad_boundary) / max(s_samples, 1)
+            wobble = np.float32(0.02) * np.sin(np.float32(TWO_PI * 1.5) * t_norm)
+            envelope[sustain_mask] = sustain + wobble
+
+        # Release phase
+        release_mask = global_indices >= ads_boundary
+        if np.any(release_mask):
+            t_norm = (global_indices[release_mask] - ads_boundary) / max(r_samples, 1)
+            envelope[release_mask] = sustain * (np.float32(1.0) - t_norm) ** 1.5
+
+        del global_indices
+        envelope = np.clip(envelope, np.float32(0.0), np.float32(1.0))
         envelope *= overall_scale
         return envelope
 
@@ -1382,20 +1398,20 @@ class AudioProcessor:
             envelope = (np.float32(0.5) - np.float32(0.5) * np.cos(TWO_PI * t_chunk / np.float32(total_duration))).astype(np.float32)
             return envelope
 
-        for i in range(len(t_chunk)):
-            t_val = t_chunk[i]
-            if t_val < fade_seconds:
-                # Fade in: Perlin smoother step
-                x = t_val / fade_seconds
-                envelope[i] = x * x * x * (x * (x * 6 - 15) + 10)
-            elif t_val > total_duration - fade_seconds:
-                # Fade out: Perlin smoother step
-                x = (total_duration - t_val) / fade_seconds
-                x = max(0.0, min(1.0, x))
-                envelope[i] = x * x * x * (x * (x * 6 - 15) + 10)
-            # else: plateau at 1.0
+        # Vectorized Perlin smoother step — no per-sample loop
+        fade_in_mask = t_chunk < fade_seconds
+        if np.any(fade_in_mask):
+            x = t_chunk[fade_in_mask] / np.float32(fade_seconds)
+            envelope[fade_in_mask] = x * x * x * (x * (x * np.float32(6.0) - np.float32(15.0)) + np.float32(10.0))
 
-        return envelope.astype(np.float32)
+        fade_out_threshold = np.float32(total_duration - fade_seconds)
+        fade_out_mask = t_chunk > fade_out_threshold
+        if np.any(fade_out_mask):
+            x = np.clip((np.float32(total_duration) - t_chunk[fade_out_mask]) / np.float32(fade_seconds),
+                        np.float32(0.0), np.float32(1.0))
+            envelope[fade_out_mask] = x * x * x * (x * (x * np.float32(6.0) - np.float32(15.0)) + np.float32(10.0))
+
+        return envelope
 
     # === CHUNK-AWARE SACRED LAYERS ===
 
@@ -1863,7 +1879,7 @@ class SoundGenerator:
                 else:
                     frequencies = self.frequency_manager.get_frequencies(sub_selection)
                     selected_ratio_set = self.frequency_manager.select_random_ratio_set(stop_event)
-                modulation_index = np.random.uniform(0.2, 0.25)
+                modulation_index = np.float32(np.random.uniform(0.2, 0.25))
                 modulation_phase = self.generate_modulation(t_phase, selected_ratio_set, modulation_index, stop_event)
                 modulation_total[current_index: current_index + phase_samples] = modulation_phase
                 current_index += phase_samples
@@ -1878,7 +1894,7 @@ class SoundGenerator:
                 segment_samples = int(sample_rate * interval_duration)
                 t_segment = t_total[current_index: current_index + segment_samples]
                 selected_ratio_set = self.frequency_manager.select_random_ratio_set(stop_event)
-                modulation_index = np.random.uniform(0.2, 0.25)
+                modulation_index = np.float32(np.random.uniform(0.2, 0.25))
                 modulation_segment = self.generate_modulation(t_segment, selected_ratio_set, modulation_index, stop_event)
                 modulation_total[current_index: current_index + segment_samples] = modulation_segment
                 current_index += segment_samples
@@ -2172,7 +2188,7 @@ class SoundGenerator:
         Produces identical audio to generate_dynamic_sound() but with ~50 MB peak memory.
         """
         total_samples = int(sample_rate * duration)
-        chunk_seconds = 10
+        chunk_seconds = 3
         chunk_size = chunk_seconds * sample_rate
 
         # ========== PRE-COMPUTATION PHASE ==========
@@ -2196,7 +2212,7 @@ class SoundGenerator:
                 else:
                     frequencies = self.frequency_manager.get_frequencies(sub_selection)
                     selected_ratio_set = self.frequency_manager.select_random_ratio_set(stop_event)
-                modulation_index = np.random.uniform(0.2, 0.25)
+                modulation_index = np.float32(np.random.uniform(0.2, 0.25))
                 seg_end = min(current_index + phase_samples, total_samples)
                 schedule.append((current_index, seg_end, dict(selected_ratio_set), modulation_index))
                 current_index = seg_end
@@ -2207,7 +2223,7 @@ class SoundGenerator:
                 interval_duration = min(interval_duration, remaining_duration)
                 segment_samples = int(sample_rate * interval_duration)
                 selected_ratio_set = self.frequency_manager.select_random_ratio_set(stop_event)
-                modulation_index = np.random.uniform(0.2, 0.25)
+                modulation_index = np.float32(np.random.uniform(0.2, 0.25))
                 seg_end = min(current_index + segment_samples, total_samples)
                 schedule.append((current_index, seg_end, dict(selected_ratio_set), modulation_index))
                 current_index = seg_end
@@ -2224,7 +2240,7 @@ class SoundGenerator:
         # ADSR parameters
         fib_ratios = np.array([1.618, 2.618, 4.236, 6.854, 11.090, 17.944], dtype=np.float32)
         base_scale = 6.0 + chaos_val * 0.5
-        attack, decay_r, sustain, release = np.random.choice(fib_ratios, 4) / base_scale
+        attack, decay_r, sustain, release = (np.random.choice(fib_ratios, 4) / np.float32(base_scale)).astype(np.float32)
         a_samples = int(attack * sample_rate * (1 + chaos_val * 0.2))
         d_samples = int(decay_r * sample_rate * (1 + chaos_val * 0.2))
         r_samples = int(release * sample_rate * (1 + chaos_val * 0.2))
@@ -2237,7 +2253,7 @@ class SoundGenerator:
         adsr_params = {
             'a_samples': a_samples, 'd_samples': d_samples,
             's_samples': s_samples, 'r_samples': r_samples,
-            'sustain': float(sustain), 'chaos': chaos_val,
+            'sustain': np.float32(sustain), 'chaos': chaos_val,
             'overall_scale': np.float32(np.random.uniform(0.95, 1.05))
         }
 
@@ -2309,8 +2325,8 @@ class SoundGenerator:
         # --- IIR filter states (SOS format for stateful sosfilt) ---
         # Compute low-pass coefficients ONCE — changing sos between chunks while
         # carrying zi state produces discontinuities (pops/clicks at boundaries).
-        cutoff_variation = np.random.uniform(-25, 25)
-        normalized_cutoff = np.clip((2200 + cutoff_variation) / (0.5 * sample_rate), 0.1, 0.99)
+        cutoff_variation = np.float32(np.random.uniform(-25, 25))
+        normalized_cutoff = np.clip((2200 + cutoff_variation) / (0.5 * sample_rate), np.float32(0.1), np.float32(0.99))
         sos_lowpass = butter(4, normalized_cutoff, btype='low', output='sos')
         zi_left = None
         zi_right = None
@@ -2414,11 +2430,11 @@ class SoundGenerator:
             # --- Stage 9: Low-pass filter with zi carry ---
             # Uses pre-computed sos_lowpass (fixed coefficients for consistent zi carry)
             if zi_left is None:
-                wave_left, zi_left = sosfilt(sos_lowpass, wave_left, zi=np.zeros((sos_lowpass.shape[0], 2), dtype=np.float64))
+                wave_left, zi_left = sosfilt(sos_lowpass, wave_left, zi=np.zeros((sos_lowpass.shape[0], 2), dtype=np.float32))
             else:
                 wave_left, zi_left = sosfilt(sos_lowpass, wave_left, zi=zi_left)
             if zi_right is None:
-                wave_right, zi_right = sosfilt(sos_lowpass, wave_right, zi=np.zeros((sos_lowpass.shape[0], 2), dtype=np.float64))
+                wave_right, zi_right = sosfilt(sos_lowpass, wave_right, zi=np.zeros((sos_lowpass.shape[0], 2), dtype=np.float32))
             else:
                 wave_right, zi_right = sosfilt(sos_lowpass, wave_right, zi=zi_right)
 
@@ -2451,26 +2467,23 @@ class SoundGenerator:
             del noise_right
             wave_right *= noise_scale_right
 
-            # --- Stage 14: Fade in/out ---
+            # --- Stage 14: Fade in/out (vectorized) ---
             if chunk_offset < fade_samples:
-                # Chunk overlaps with fade-in region
-                for i in range(chunk_samples):
-                    global_idx = chunk_offset + i
-                    if global_idx < fade_samples:
-                        fade_val = (global_idx / fade_samples) ** 1.5
-                        wave_left[i] *= fade_val
-                        wave_right[i] *= fade_val
+                fade_end = min(chunk_samples, fade_samples - chunk_offset)
+                global_indices = np.arange(chunk_offset, chunk_offset + fade_end, dtype=np.float32)
+                fade_vals = (global_indices / fade_samples) ** 1.5
+                wave_left[:fade_end] *= fade_vals
+                wave_right[:fade_end] *= fade_vals
+                del global_indices, fade_vals
 
-            if chunk_offset + chunk_samples > total_samples - fade_samples:
-                # Chunk overlaps with fade-out region
-                fade_out_start = total_samples - fade_samples
-                for i in range(chunk_samples):
-                    global_idx = chunk_offset + i
-                    if global_idx >= fade_out_start:
-                        fade_val = ((total_samples - global_idx) / fade_samples) ** 1.5
-                        fade_val = max(0.0, fade_val)
-                        wave_left[i] *= fade_val
-                        wave_right[i] *= fade_val
+            fade_out_start = total_samples - fade_samples
+            if chunk_offset + chunk_samples > fade_out_start:
+                start_idx = max(0, fade_out_start - chunk_offset)
+                global_indices = np.arange(chunk_offset + start_idx, chunk_offset + chunk_samples, dtype=np.float32)
+                fade_vals = np.clip(((total_samples - global_indices) / fade_samples) ** 1.5, 0.0, 1.0)
+                wave_left[start_idx:] *= fade_vals
+                wave_right[start_idx:] *= fade_vals
+                del global_indices, fade_vals
 
             # --- Stage 15: Toroidal pan curve ---
             theta_perturb = np.float32(0.15) * simplex_pan.generate_noise(t_chunk * np.float32(0.005), 0.0, 0.0, 0.0, 0.0)
@@ -2485,7 +2498,7 @@ class SoundGenerator:
 
             # sosfilt with zi for pan curve
             if zi_pan is None:
-                pan_curve, zi_pan = sosfilt(sos_pan, pan_curve, zi=np.zeros((sos_pan.shape[0], 2), dtype=np.float64))
+                pan_curve, zi_pan = sosfilt(sos_pan, pan_curve, zi=np.zeros((sos_pan.shape[0], 2), dtype=np.float32))
             else:
                 pan_curve, zi_pan = sosfilt(sos_pan, pan_curve, zi=zi_pan)
 
