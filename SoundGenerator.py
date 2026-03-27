@@ -224,8 +224,6 @@ class AudioProcessor:
         """Pre-compute commonly used filter coefficients."""
         # Low-pass 2200 Hz, order 4 (used in low_pass_filter)
         self._filter_cache[('lowpass', 2200, 4)] = butter(4, 2200 / self.nyquist, btype='low')
-        # Low-pass for spatialized_triple_helix
-        self._filter_cache[('lowpass', 0.003, 2)] = butter(2, 0.003 / self.nyquist, btype='low')
         # Low-pass for pan curve in generate_dynamic_sound
         self._filter_cache[('lowpass', 0.002, 2)] = butter(2, 0.002 / self.nyquist, btype='low')
 
@@ -596,81 +594,7 @@ class AudioProcessor:
         return jit_wave_shaping(signal, shape_factor)
     def apply_fractional_delay(self, signal: np.ndarray, delay: float) -> np.ndarray:
         return shift(signal, shift=delay, order=3, mode='nearest')
-    def spatialized_triple_helix(self, signal: np.ndarray, t: np.ndarray,
-                                 sample_rate: int = 48000) -> np.ndarray:
-        # Rössler system for chaotic modulation (with caching for performance)
-        def rossler(state, t, a=0.2, b=0.2, c=5.7):
-            x, y, z = state
-            dx_dt = -y - z
-            dy_dt = x + a * y
-            dz_dt = b + z * (x - c)
-            return [dx_dt, dy_dt, dz_dt]
 
-        # Cache key based on time array characteristics (deterministic for same duration)
-        cache_key = (len(t), round(float(t[-1]), 6) if len(t) > 0 else 0.0)
-
-        with self._rossler_cache_lock:
-            if cache_key not in self._rossler_cache:
-                if len(self._rossler_cache) > 5:
-                    self._rossler_cache.clear()
-                # Integrate Rössler equations and cache normalized result (float32)
-                t_scaled = t * np.float32(0.1)
-                initial_state = [1.0, 1.0, 1.0]
-                trajectory = odeint(rossler, initial_state, t_scaled)
-                del t_scaled
-                x, y, z = trajectory.T
-                del trajectory
-                self._rossler_cache[cache_key] = (
-                    (x / np.max(np.abs(x))).astype(np.float32),
-                    (y / np.max(np.abs(y))).astype(np.float32),
-                    (z / np.max(np.abs(z))).astype(np.float32)
-                )
-            x_rossler, y_rossler, z_rossler = self._rossler_cache[cache_key]
-        # Logarithmic spiral parameters (float32 throughout)
-        theta = np.float32(0.002) * t
-        phi_angle = np.float32(0.001) * t
-        # Hybrid spiral: Logarithmic with Rössler perturbations
-        r_hybrid = np.float32(0.1) * np.exp(np.float32(0.02) * theta) * (np.float32(1.0) + np.float32(0.1) * x_rossler)
-        theta_hybrid = theta + np.float32(0.05) * y_rossler
-        phi_hybrid = phi_angle + np.float32(0.2) * z_rossler
-        del theta, phi_angle
-        # 3D position in spherical coordinates (JIT-compiled)
-        x, y, z = jit_spherical_to_cartesian(r_hybrid, theta_hybrid, phi_hybrid)
-        del r_hybrid, theta_hybrid, phi_hybrid
-        # Smooth with low-pass filter (use cached coefficients)
-        b_filt, a_filt = self._get_filter('lowpass', 0.003, 2)
-        x_smooth = lfilter(b_filt, a_filt, x).astype(np.float32)
-        y_smooth = lfilter(b_filt, a_filt, y).astype(np.float32)
-        z_smooth = lfilter(b_filt, a_filt, z).astype(np.float32)
-        del x, y, z
-        # Stereo panning (JIT-compiled gain calculation)
-        pan_horizontal = np.tanh(x_smooth * np.float32(0.5)).astype(np.float32)
-        del x_smooth
-        depth_factor = ((y_smooth + np.float32(1.0)) * np.float32(0.5)).astype(np.float32)
-        pan_vertical = np.sin(z_smooth * np.float32(np.pi / 2)).astype(np.float32)
-        del z_smooth
-        left_gain, right_gain = jit_stereo_gains(pan_horizontal, depth_factor, pan_vertical)
-        del depth_factor, pan_vertical
-        left_channel = signal * left_gain
-        right_channel = signal * right_gain
-        del left_gain, right_gain
-        # Add delay with Simplex5D noise
-        simplex = self._get_simplex()
-        delay_mod = simplex.generate_noise(t * np.float32(0.01), 0.0, 0.0, 0.0, 0.0) * np.float32(0.3)
-        max_delay_samples = np.float32(sample_rate * 2.0 / 1000.0)
-        depth_delay = np.clip(-y_smooth, 0, 1)
-        left_delays = np.maximum(0, pan_horizontal + delay_mod) * max_delay_samples * (np.float32(1.0) + depth_delay * np.float32(0.5))
-        right_delays = np.maximum(0, -pan_horizontal + delay_mod) * max_delay_samples * (np.float32(1.0) + depth_delay * np.float32(0.5))
-        del delay_mod, depth_delay
-        left_channel = self.apply_fractional_delay(left_channel, np.mean(left_delays))
-        right_channel = self.apply_fractional_delay(right_channel, np.mean(right_delays))
-        del left_delays, right_delays, pan_horizontal
-        # Build stereo directly instead of column_stack (avoids temporary copy)
-        stereo_wave = np.empty((len(t), 2), dtype=np.float32)
-        stereo_wave[:, 0] = left_channel
-        stereo_wave[:, 1] = right_channel
-        del left_channel, right_channel
-        return stereo_wave
     def fractal_frequency_variation(self, t: np.ndarray, base_freq: float,
                                     stop_event: Optional[threading.Event] = None) -> np.ndarray:
         if stop_event and stop_event.is_set():
@@ -695,15 +619,51 @@ class AudioProcessor:
         gamma = (np.float32(0.15) * simplex.generate_noise(t * np.float32(0.01), 0.0, 0.0, 0.0, 0.0)).astype(np.float32)
         # Use JIT-compiled function for wave computation
         return jit_quantum_harmonic(t, base_freq, gamma)  # Already float32
-    def recursive_fractal_feedback(self, signal: np.ndarray, depth: int = 4,
-                                   factor: float = 0.4) -> np.ndarray:
-        """Iterative fractal feedback - avoids recursion overhead."""
+    def compute_rossler_trajectory(self, duration: float, rate: float = 10.0) -> tuple:
+        """Pre-compute a low-rate Rössler attractor trajectory for chaotic panning.
+        Returns (x, y, z, t_rossler) normalized float32 arrays at the given sample rate.
+        Memory: ~432 KB for 60 minutes at 10 Hz. Deterministic from initial conditions."""
+        n_samples = int(duration * rate)
+        if n_samples < 2:
+            z = np.zeros(2, dtype=np.float32)
+            return z, z.copy(), z.copy(), np.array([0, duration], dtype=np.float32)
+
+        t_rossler = np.linspace(0, duration, n_samples, dtype=np.float64)
+
+        def rossler(state, t, a=0.2, b=0.2, c=5.7):
+            x, y, z = state
+            return [-y - z, x + a * y, b + z * (x - c)]
+
+        trajectory = odeint(rossler, [1.0, 1.0, 1.0], t_rossler * 0.1)
+        x, y, z = trajectory.T
+        del trajectory
+
+        # Normalize to [-1, 1] range
+        x = (x / max(np.abs(x).max(), 1e-10)).astype(np.float32)
+        y = (y / max(np.abs(y).max(), 1e-10)).astype(np.float32)
+        z = (z / max(np.abs(z).max(), 1e-10)).astype(np.float32)
+        t_rossler = t_rossler.astype(np.float32)
+
+        return x, y, z, t_rossler
+
+    def phi_fractal_feedback(self, signal: np.ndarray, sample_rate: int = 48000,
+                              depth: int = 3, factor: float = 0.05) -> np.ndarray:
+        """PHI-spaced fractal micro-echoes — self-similar harmonic enrichment.
+        Adds golden-ratio-delayed copies at decreasing amplitudes, creating
+        organic overtone structure without altering the fundamental frequency.
+        Very subtle (factor=0.05): each echo is 5% of the previous."""
         result = signal.copy()
-        current = signal * np.float32(0.6)
-        f32_factor = np.float32(factor)
-        for _ in range(depth):
-            result += f32_factor * current
-            current *= np.float32(0.6)
+        base_delay = int(sample_rate / PHI)  # ~29,708 samples (~0.619s) at 48kHz
+        for i in range(depth):
+            delay = base_delay * (i + 1)
+            if delay >= len(signal):
+                break
+            amplitude = np.float32(factor ** (i + 1))
+            # Shift signal forward by delay samples
+            delayed = np.zeros_like(signal)
+            delayed[delay:] = signal[:-delay] * amplitude
+            result += delayed
+            del delayed
         return result
     def binaural_oscillator(self, t: np.ndarray, freq_pair: tuple, stop_event: Optional[threading.Event] = None) -> np.ndarray:
         left_freq, right_freq = freq_pair
@@ -1820,35 +1780,7 @@ class SoundGenerator:
     def generate_modulation(self, t: np.ndarray, ratio_set: Dict[str, float],
                             modulation_index: float, stop_event: Optional[threading.Event]) -> np.ndarray:
         return self.audio_processor.geometric_modulation(t, ratio_set, modulation_index, stop_event)
-    def generate_triple_helix_sound(self, duration: float, base_freq: float,
-                                    sample_rate: int = 48000,
-                                    stop_event: Optional[threading.Event] = None) -> np.ndarray:
-        t_total = np.linspace(0, duration, int(sample_rate * duration), endpoint=False, dtype=np.float32)
-        simplex = self.audio_processor._get_simplex()
 
-        helix1 = simplex.generate_noise(t_total * np.float32(0.005), 1.0, 1.0, 1.0, 1.0)
-        helix2 = simplex.generate_noise(t_total * np.float32(0.02), 1.2, 1.2, 1.2, 1.2)
-        helix3 = simplex.generate_noise(t_total * np.float32(0.08), 1.4, 1.4, 1.4, 1.4)
-        # Combine helix layers in-place to reduce temporaries
-        noise_layer = helix1  # Reuse helix1 buffer
-        noise_layer *= np.float32(0.6)
-        noise_layer += np.float32(0.4) * helix2
-        noise_layer += np.float32(0.3) * helix3
-        del helix2, helix3
-
-        quantum_wave = self.audio_processor.quantum_harmonic_interference(t_total, base_freq)
-        fractal_wave = self.audio_processor.recursive_fractal_feedback(quantum_wave, depth=4, factor=0.4)
-        del quantum_wave
-        # In-place: add noise to fractal wave
-        fractal_wave += noise_layer * np.float32(0.15)
-        del noise_layer
-
-        filtered_wave = self.audio_processor.low_pass_filter(fractal_wave, cutoff=2200, stop_event=stop_event)
-        del fractal_wave
-        stereo_wave = self.audio_processor.spatialized_triple_helix(filtered_wave, t_total, sample_rate)
-        del filtered_wave
-        stereo_wave *= np.float32(self.master_volume)
-        return stereo_wave
     def generate_dynamic_sound(self, duration: float, base_freq: float,
                                sample_rate: int = 48000,
                                interval_duration_list: List[int] = [30, 45, 60, 75, 90],
@@ -1971,6 +1903,9 @@ class SoundGenerator:
             update_progress(0.7)  # After wave generation (with or without taygetan)
         wave_left = self.audio_processor.wave_shaping(wave_left, shape_factor=2.5, stop_event=stop_event)
         wave_right = self.audio_processor.wave_shaping(wave_right, shape_factor=2.5, stop_event=stop_event)
+        # PHI-fractal feedback (subtle self-similar harmonic enrichment)
+        wave_left = self.audio_processor.phi_fractal_feedback(wave_left, sample_rate)
+        wave_right = self.audio_processor.phi_fractal_feedback(wave_right, sample_rate)
         if update_progress:
             update_progress(0.75)  # Shaping 5%
         wave_left = self.audio_processor.low_pass_filter(wave_left, stop_event=stop_event)
@@ -2013,10 +1948,15 @@ class SoundGenerator:
         theta_freq = np.float32(np.random.uniform(0.01, 0.02))  # Major cycle
         phi_freq = theta_freq * np.float32(PHI)                   # Minor cycle (PHI ratio = never repeats)
 
-        # Simplex perturbation for organic drift
+        # Simplex perturbation for organic drift + Rössler chaotic perturbation
         simplex = self.audio_processor._get_simplex()
-        theta_perturb = np.float32(0.15) * simplex.generate_noise(t_total * np.float32(0.005), 0.0, 0.0, 0.0, 0.0)
-        phi_perturb = np.float32(0.15) * simplex.generate_noise(t_total * np.float32(0.007), np.float32(1.0), 0.0, 0.0, 0.0)
+        theta_perturb = np.float32(0.10) * simplex.generate_noise(t_total * np.float32(0.005), 0.0, 0.0, 0.0, 0.0)
+        phi_perturb = np.float32(0.10) * simplex.generate_noise(t_total * np.float32(0.007), np.float32(1.0), 0.0, 0.0, 0.0)
+        # Rössler chaotic trajectory for genuine mathematical unpredictability
+        ross_x, ross_y, _, ross_t = self.audio_processor.compute_rossler_trajectory(duration, rate=10.0)
+        theta_perturb += np.float32(0.08) * np.interp(t_total, ross_t, ross_x).astype(np.float32)
+        phi_perturb += np.float32(0.08) * np.interp(t_total, ross_t, ross_y).astype(np.float32)
+        del ross_x, ross_y, ross_t
 
         theta = TWO_PI * theta_freq * t_total + theta_perturb
         phi = TWO_PI * phi_freq * t_total + phi_perturb
@@ -2342,6 +2282,10 @@ class SoundGenerator:
         # --- 12-sample right-channel delay buffer ---
         delay_buffer = np.zeros(12, dtype=np.float32)
 
+        # --- Rössler trajectory for chaotic panning perturbation ---
+        # Pre-computed at low rate (10 Hz), interpolated per chunk. ~432 KB for 60 min.
+        ross_x, ross_y, ross_z, ross_t = self.audio_processor.compute_rossler_trajectory(duration, rate=10.0)
+
         # --- Normalization: estimate peak from 0.5s sample at full envelope + LFO peak ---
         # Use envelope=1.0 (peak of attack) to estimate the loudest the signal can get,
         # matching batch pipeline's global-max normalization behavior.
@@ -2427,6 +2371,10 @@ class SoundGenerator:
             wave_left = jit_wave_shaping(wave_left, 2.5)
             wave_right = jit_wave_shaping(wave_right, 2.5)
 
+            # --- Stage 8b: PHI-fractal feedback (subtle self-similar harmonic enrichment) ---
+            wave_left = self.audio_processor.phi_fractal_feedback(wave_left, sample_rate)
+            wave_right = self.audio_processor.phi_fractal_feedback(wave_right, sample_rate)
+
             # --- Stage 9: Low-pass filter with zi carry ---
             # Uses pre-computed sos_lowpass (fixed coefficients for consistent zi carry)
             if zi_left is None:
@@ -2485,9 +2433,16 @@ class SoundGenerator:
                 wave_right[start_idx:] *= fade_vals
                 del global_indices, fade_vals
 
-            # --- Stage 15: Toroidal pan curve ---
-            theta_perturb = np.float32(0.15) * simplex_pan.generate_noise(t_chunk * np.float32(0.005), 0.0, 0.0, 0.0, 0.0)
-            phi_perturb = np.float32(0.15) * simplex_pan.generate_noise(t_chunk * np.float32(0.007), np.float32(1.0), 0.0, 0.0, 0.0)
+            # --- Stage 15: Toroidal pan curve with Rössler chaotic perturbation ---
+            # Simplex provides smooth organic drift; Rössler adds genuine mathematical chaos
+            theta_perturb = np.float32(0.10) * simplex_pan.generate_noise(t_chunk * np.float32(0.005), 0.0, 0.0, 0.0, 0.0)
+            phi_perturb = np.float32(0.10) * simplex_pan.generate_noise(t_chunk * np.float32(0.007), np.float32(1.0), 0.0, 0.0, 0.0)
+            # Interpolate pre-computed Rössler trajectory to chunk sample rate
+            ross_theta = np.float32(0.08) * np.interp(t_chunk, ross_t, ross_x).astype(np.float32)
+            ross_phi = np.float32(0.08) * np.interp(t_chunk, ross_t, ross_y).astype(np.float32)
+            theta_perturb += ross_theta
+            phi_perturb += ross_phi
+            del ross_theta, ross_phi
 
             theta = TWO_PI * torus_theta_freq * t_chunk + theta_perturb
             phi = TWO_PI * torus_phi_freq * t_chunk + phi_perturb
