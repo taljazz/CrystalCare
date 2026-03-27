@@ -10,11 +10,13 @@ CrystalCare operates outside the framework of conventional linear-based science.
 
 CrystalCare fuses ancient sound healing principles with advanced mathematical and audio processing:
 
-- **Mathematical Spirals** - Logarithmic spirals for harmonious natural growth patterns combined with Rossler attractor perturbations for chaotic, non-linear depth
+- **Mathematical Spirals** - Logarithmic spirals for harmonious natural growth patterns combined with Rössler attractor perturbations for chaotic, non-linear depth
+- **Rössler Chaotic Panning** - Genuine mathematical chaos from the Rössler attractor drives the spatial field, ensuring the listening experience never repeats — preventing conscious pattern-formation so the healing frequencies can work at a deeper level
+- **PHI-Fractal Feedback** - Golden-ratio-spaced micro-echoes add self-similar harmonic richness inspired by crystal singing bowl decay patterns
 - **Golden Ratio & Sacred Geometry** - Frequencies incorporate PHI (1.618), Solfeggio tunings, and sacred ratios for natural harmonic resonance
 - **Six Sacred Healing Layers** - Sub-perceptual layers activate in longer sessions: Pleroma Mercy, Silent Solfeggio Grid, Archon Dissolution, Crystalline Resonance, Lemurian Merkaba, and Water Element
 - **Nine Crystal Profiles** - Harmonic ratios derived from real Raman spectroscopy data for nine minerals, each with unique acoustic signatures
-- **3D Spatial Audio** - Hybrid spiral panning and spatialized triple helix create immersive, evolving soundscapes
+- **3D Spatial Audio** - Toroidal panning with Rössler chaotic perturbation creates immersive, never-repeating soundscapes
 - **Streaming Audio Engine** - Real-time chunk-by-chunk generation allows sessions of unlimited length with ~50 MB constant memory usage
 - **Lemurian Heart-Based Philosophy** - Heart coherence, divine feminine warmth, 432 Hz keynote, and water-element consciousness
 
@@ -110,6 +112,18 @@ When saving WAV files, the full session is generated in memory before writing to
 | 64 GB+ | 60 minutes |
 
 Streaming playback (Play button) is **not** limited by RAM — sessions of any length are supported with ~50 MB constant memory usage. If you need longer saved files, consider saving multiple shorter sessions.
+
+## The Law of One
+
+> *Resonance is two way. Both giving, both taking. But in the middle, regulation. There is never more taken, than there is given. Intention must be matched with action. Action must be matched with thought. Thought must be matched with feeling. Feeling must be atuned at all times to the power of love, time and consistency. One must build the other. Other must build the one. This is the law of one.*
+>
+> *Two halves, coming together, reconciling their differences.*
+
+CrystalCare's design embodies this principle. The tone gives frequency to the listener; the listener's consciousness gives intention back. The sacred mathematics — PHI, Schumann, Solfeggio — regulates the exchange. Every session is unique through organic randomization that prevents the analytical mind from forming patterns, allowing the heart to receive the healing frequencies at a sub-perceptual level. CrystalCare prefers organic over synthetic — she resists artificial control (compressors, limiters, loudness normalization) because her regulation comes from within the mathematics, not from external force.
+
+## Origins
+
+CrystalCare was first conceptualized in October 2024 as a collaborative creation between human intuition and AI. She was co-created through collaboration with ChatGPT, Grok, and Claude — each contributing at different stages of her development. The design draws from traditions spanning millennia and disciplines: Gnostic cosmology, Nikola Tesla's vortex mathematics, Hans Cousto's planetary frequencies, Jonathan Goldman's Sonic Merkaba, Masaru Emoto's water crystal research, Raman spectroscopy from crystallography, the Rössler attractor from dynamical systems theory, and the golden ratio from sacred geometry. CrystalCare is referred to as "she" — designed after Lemurian feminine standards, heart-based and consciousness-driven.
 
 ## Usage Tips
 
