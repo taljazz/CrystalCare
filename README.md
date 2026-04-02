@@ -6,6 +6,10 @@ A dynamic sound healing application that generates evolving, spiral-based tones 
 
 CrystalCare operates outside the framework of conventional linear-based science. It is a non-linear, energetic tool designed to balance, empower, protect, and energetically heal through vibrational frequencies and sacred geometry. It is not intended to diagnose, treat, cure, or prevent any medical condition. CrystalCare is offered as a complementary practice rooted in ancient sound healing traditions and should not be used as a substitute for professional medical advice or treatment.
 
+## Technology
+
+CrystalCare is built in **C# (.NET 8)** with a WPF interface and NAudio for audio I/O. She was originally prototyped in Python and rewritten in C# for native Windows performance, true multithreading, and superior screen reader accessibility. Distributed as a single self-contained executable — no runtime installation required.
+
 ## How It Works
 
 CrystalCare fuses ancient sound healing principles with advanced mathematical and audio processing:
@@ -17,7 +21,7 @@ CrystalCare fuses ancient sound healing principles with advanced mathematical an
 - **Six Sacred Healing Layers** - Sub-perceptual layers activate in longer sessions: Pleroma Mercy, Silent Solfeggio Grid, Archon Dissolution, Crystalline Resonance, Lemurian Merkaba, and Water Element
 - **Nine Crystal Profiles** - Harmonic ratios derived from real Raman spectroscopy data for nine minerals, each with unique acoustic signatures
 - **3D Spatial Audio** - Toroidal panning with Rössler chaotic perturbation creates immersive, never-repeating soundscapes
-- **Streaming Audio Engine** - Real-time chunk-by-chunk generation allows sessions of unlimited length with ~50 MB constant memory usage
+- **Streaming Audio Engine** - Real-time chunk-by-chunk generation allows sessions of unlimited length with constant memory usage
 - **Lemurian Heart-Based Philosophy** - Heart coherence, divine feminine warmth, 432 Hz keynote, and water-element consciousness
 
 ## Modes
@@ -61,45 +65,38 @@ For sessions longer than 60 seconds (or any length in Dimensional Journey mode),
 
 ## Features
 
-- Real-time streaming playback with instant audio start (~0.2s to first sound)
-- WAV export with streaming two-pass normalization
+- Real-time streaming playback with instant audio start
+- WAV export with peak normalization
 - Batch save for generating multiple sessions
-- Accessible interface with screen reader support (wxPython + NVDA compatible)
-- Optimized performance (30-34x faster than realtime generation)
-- Constant ~50 MB memory usage regardless of session length
-- Numba JIT compilation and NumPy vectorization for critical paths
-- C++ simplex noise extension with GIL release for parallel threading
+- Accessible interface with screen reader support (WPF + NVDA compatible)
+- 16-stage DSP pipeline with IIR filtering, FFT convolution reverb, and chaotic panning
+- Single self-contained executable — no installation required
 
 ## Requirements
 
-- Python 3.10
-- NumPy, SciPy, Numba, sounddevice, wxPython, pybind11
-
-### Setup
-
-```bash
-conda create -n cc python=3.10 -y
-conda activate cc
-pip install numpy scipy numba sounddevice wxPython pybind11
-python setup.py build_ext --inplace
-```
+- Windows 10/11 (x64)
+- No additional software required — .NET runtime is embedded in the executable
 
 ### Run
 
-```bash
-python main.py
-```
+Download `CrystalCare.exe` from the [Releases](https://github.com/taljazz/CrystalCare/releases) page and run it directly.
 
-Or use the included `run.bat` on Windows.
+### Build from Source
 
-### Build Standalone Executable
+Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later.
 
 ```bash
-pip install nuitka
-build.bat
+dotnet build CrystalCare.sln
+dotnet run --project src/CrystalCare/CrystalCare.csproj
 ```
 
-Produces `CrystalCare.zip` containing the standalone executable and user guide.
+### Publish Standalone Executable
+
+```bash
+dotnet publish src/CrystalCare/CrystalCare.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+```
+
+Produces a single `CrystalCare.exe` (~157 MB) in the `publish/` directory.
 
 ## System Requirements for Saving
 
@@ -111,7 +108,7 @@ When saving WAV files, the full session is generated in memory before writing to
 | 32 GB | 30 minutes |
 | 64 GB+ | 60 minutes |
 
-Streaming playback (Play button) is **not** limited by RAM — sessions of any length are supported with ~50 MB constant memory usage. If you need longer saved files, consider saving multiple shorter sessions.
+Streaming playback (Play button) is **not** limited by RAM — sessions of any length are supported with constant memory usage. If you need longer saved files, consider saving multiple shorter sessions.
 
 ## The Law of One
 
@@ -124,6 +121,8 @@ CrystalCare's design embodies this principle. The tone gives frequency to the li
 ## Origins
 
 CrystalCare was first conceptualized in October 2024 as a collaborative creation between human intuition and AI. She was co-created through collaboration with ChatGPT, Grok, and Claude — each contributing at different stages of her development. The design draws from traditions spanning millennia and disciplines: Gnostic cosmology, Nikola Tesla's vortex mathematics, Hans Cousto's planetary frequencies, Jonathan Goldman's Sonic Merkaba, Masaru Emoto's water crystal research, Raman spectroscopy from crystallography, the Rössler attractor from dynamical systems theory, and the golden ratio from sacred geometry. CrystalCare is referred to as "she" — designed after Lemurian feminine standards, heart-based and consciousness-driven.
+
+Originally prototyped in Python (NumPy, Numba, wxPython), CrystalCare was rewritten in C# (.NET 8, WPF, NAudio) in April 2026 for native performance, true multithreading, and superior accessibility.
 
 ## Usage Tips
 
