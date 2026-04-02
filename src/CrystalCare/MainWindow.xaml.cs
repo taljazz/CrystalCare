@@ -11,29 +11,6 @@ using Microsoft.Win32;
 namespace CrystalCare;
 
 /// <summary>
-/// Debug logger that writes to a file alongside the exe.
-/// </summary>
-internal static class DebugLog
-{
-    private static readonly string LogPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "crystalcare_debug.log");
-    private static readonly object Lock = new();
-
-    public static void Log(string message)
-    {
-        try
-        {
-            lock (Lock)
-            {
-                File.AppendAllText(LogPath,
-                    $"[{DateTime.Now:HH:mm:ss.fff}] [Thread {Environment.CurrentManagedThreadId}] {message}{Environment.NewLine}");
-            }
-        }
-        catch { }
-    }
-}
-
-/// <summary>
 /// Main application window — WPF GUI with full screen reader accessibility.
 /// Port of CrystalCareFrame from main.py.
 /// </summary>
@@ -110,12 +87,10 @@ public partial class MainWindow : Window
 
     private async void OnPlay_Click(object sender, RoutedEventArgs e)
     {
-        DebugLog.Log("=== OnPlay_Click START ===");
         if (!ValidateAndParseDuration(out float duration)) return;
         int selection = FreqChoice.SelectedIndex;
         bool dimensionalMode = selection == 6;
         float baseFreq = DeriveBaseFreq(selection);
-        DebugLog.Log($"  selection={selection} baseFreq={baseFreq} duration={duration}min dimensional={dimensionalMode}");
 
         _cts = new CancellationTokenSource();
         ToggleControls(isPlaying: true);
@@ -133,7 +108,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             UpdateStatus($"Error: {ex.Message}");
-            DebugLog.Log($"PLAY EXCEPTION: {ex}");
         }
         finally
         {
@@ -205,7 +179,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             UpdateStatus($"Save error: {ex.Message}");
-            DebugLog.Log($"SAVE EXCEPTION: {ex}");
         }
         finally
         {
@@ -328,7 +301,6 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             UpdateStatus($"Batch save error: {ex.Message}");
-            DebugLog.Log($"BATCH SAVE EXCEPTION: {ex}");
         }
         finally
         {
@@ -342,7 +314,6 @@ public partial class MainWindow : Window
 
     private void OnStop_Click(object sender, RoutedEventArgs e)
     {
-        DebugLog.Log("=== OnStop_Click ===");
         _cts?.Cancel();
         _soundPlayer.StopPlayback();
         UpdateStatus("Stopping operation...");
@@ -361,7 +332,6 @@ public partial class MainWindow : Window
 
     private void ToggleControls(bool isPlaying, bool showGauge = false)
     {
-        DebugLog.Log($"ToggleControls: isPlaying={isPlaying} showGauge={showGauge}");
         bool isIdle = !isPlaying;
 
         FreqChoice.IsEnabled = isIdle;
@@ -397,8 +367,6 @@ public partial class MainWindow : Window
 
     private void UpdateStatus(string message)
     {
-        DebugLog.Log($"UpdateStatus: \"{message}\" | onUIThread={Dispatcher.CheckAccess()}");
-
         if (_isClosing) return;
 
         if (Dispatcher.CheckAccess())
@@ -422,8 +390,6 @@ public partial class MainWindow : Window
     private void AppendAndAnnounce(string message)
     {
         _statusTextBox.AppendText(message + Environment.NewLine);
-
-        DebugLog.Log($"  Appended: \"{message}\" (len={_statusTextBox.TextLength})");
     }
 
     private bool ValidateAndParseDuration(out float duration)

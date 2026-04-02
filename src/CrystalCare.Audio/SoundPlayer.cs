@@ -51,7 +51,6 @@ public sealed class SoundPlayer : IDisposable
             catch (Exception ex)
             {
                 updateStatus?.Invoke($"Generation error: {ex.Message}");
-                updateStatus?.Invoke($"Stack: {ex.StackTrace}");
             }
             finally
             {
