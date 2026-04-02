@@ -18,7 +18,7 @@ public sealed class SoundGenerator : IDisposable
     private readonly ChaoticSelector _chaoticSelector = new();
     private readonly Random _rng = new();
 
-    public float MasterVolume { get; set; } = 1.0f;
+    public float MasterVolume { get; set; } = 0.75f;
 
     public SoundGenerator(FrequencyManager frequencyManager)
     {
@@ -96,18 +96,24 @@ public sealed class SoundGenerator : IDisposable
         for (int i = 0; i < modDepths.Length; i++)
             modDepths[i] = (float)(_rng.NextDouble() * 0.2 + 0.15);
 
-        // --- IIR low-pass filter (order 4 Butterworth, ~2200 Hz cutoff) ---
-        // Uses Audio EQ Cookbook biquad — numerically stable at any cutoff.
+        // --- IIR low-pass filter (order 2 Butterworth, ~5500 Hz cutoff) ---
+        // Gentler than the original order 4 at 2200 Hz — lets upper harmonics through
+        // for brighter, more open tones while still smoothing harsh digital artifacts.
+        // Order 2 = 12 dB/octave rolloff (vs 24 dB/octave at order 4).
         float cutoffVariation = (float)(_rng.NextDouble() * 50 - 25);
-        float lpCutoff = global::System.Math.Clamp(2200f + cutoffVariation, 100f, 23000f);
-        var filterLeft = BiquadFilter.CreateLowpass(4, lpCutoff, sampleRate);
-        var filterRight = BiquadFilter.CreateLowpass(4, lpCutoff, sampleRate);
+        float lpCutoff = global::System.Math.Clamp(5500f + cutoffVariation, 2000f, 23000f);
+        var filterLeft = BiquadFilter.CreateLowpass(2, lpCutoff, sampleRate);
+        var filterRight = BiquadFilter.CreateLowpass(2, lpCutoff, sampleRate);
 
         // Pan curve filter — 0.002 Hz exponential smoother for ultra-slow panning
         // This makes the toroidal panning extremely smooth and organic — only the
         // slowest drift survives. Matches Python: butter(2, 0.002 / Nyquist).
         // ExponentialSmoother handles extreme cutoffs that Butterworth cannot.
         var panSmoother = new ExponentialSmoother(0.002f, sampleRate);
+
+        // --- PHI-fractal feedback instances (carry echo tail between chunks) ---
+        var phiFractalLeft = new PhiFractalFeedback(sampleRate);
+        var phiFractalRight = new PhiFractalFeedback(sampleRate);
 
         // --- Reverb instances ---
         var reverbLeft = new StreamingReverb(sampleRate);
@@ -216,9 +222,9 @@ public sealed class SoundGenerator : IDisposable
             WaveShaper.Process(waveLeft, 2.5f);
             WaveShaper.Process(waveRight, 2.5f);
 
-            // --- Stage 8b: PHI-fractal feedback ---
-            waveLeft = PhiFractalFeedback.Process(waveLeft, sampleRate);
-            waveRight = PhiFractalFeedback.Process(waveRight, sampleRate);
+            // --- Stage 8b: PHI-fractal feedback (stateful — carries echo tail between chunks) ---
+            waveLeft = phiFractalLeft.ProcessChunk(waveLeft);
+            waveRight = phiFractalRight.ProcessChunk(waveRight);
 
             // --- Stage 9: Low-pass filter with zi carry ---
             filterLeft.Process(waveLeft);
