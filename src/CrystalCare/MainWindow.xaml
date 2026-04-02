@@ -1,0 +1,78 @@
+<Window x:Class="CrystalCare.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:wf="clr-namespace:System.Windows.Forms.Integration;assembly=WindowsFormsIntegration"
+        mc:Ignorable="d"
+        Title="CrystalCare - Sound Healing"
+        Height="600" Width="600"
+        WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing"
+        AutomationProperties.Name="CrystalCare Sound Healing Application">
+
+    <DockPanel LastChildFill="True">
+        <StackPanel DockPanel.Dock="Top" Margin="10">
+
+            <!-- Frequency Set Selection (matches Python: wx.StaticBox + wx.Choice) -->
+            <GroupBox Header="Select Frequency Set" Margin="0,0,0,5"
+                      AutomationProperties.Name="Select Frequency Set">
+                <ComboBox x:Name="FreqChoice" Margin="10"
+                          AutomationProperties.Name="Frequency set"
+                          ToolTip="Choose a set of frequencies for your session."
+                          SelectedIndex="0">
+                    <ComboBoxItem Content="1. Lower Frequencies (174Hz, 396Hz, 417Hz, 528Hz)" />
+                    <ComboBoxItem Content="2. Higher Frequencies (852Hz, 963Hz)" />
+                    <ComboBoxItem Content="3. Atlantean Cosmic Frequencies (136.10Hz, 194.18Hz, 211.44Hz, 303Hz)" />
+                    <ComboBoxItem Content="4. Combined Mode (Sacred Geometry + Flower of Life)" />
+                    <ComboBoxItem Content="5. Triple Helix DNA Activation Mode" />
+                    <ComboBoxItem Content="6. Taygetan Resonances (DNA Activation with Binaural Sync)" />
+                    <ComboBoxItem Content="7. Dimensional Journey (1D-9D Realignment)" />
+                </ComboBox>
+            </GroupBox>
+
+            <!-- Duration Input (matches Python: wx.StaticBox + wx.TextCtrl, HORIZONTAL) -->
+            <GroupBox Header="Session Duration (Minutes)" Margin="0,0,0,5"
+                      AutomationProperties.Name="Session Duration">
+                <TextBox x:Name="DurationText" Margin="10"
+                         AutomationProperties.Name="Duration in minutes"
+                         ToolTip="Enter the duration of the session in minutes (max 60)." />
+            </GroupBox>
+
+            <!-- Buttons (matches Python: wx.BoxSizer HORIZONTAL, centered) -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,5">
+                <Button x:Name="PlayBtn" Content="Play" Margin="5" Padding="10,5"
+                        Click="OnPlay_Click"
+                        AutomationProperties.Name="Play"
+                        ToolTip="Generate and play the sound session." />
+                <Button x:Name="SaveBtn" Content="Save as WAV" Margin="5" Padding="10,5"
+                        Click="OnSave_Click"
+                        AutomationProperties.Name="Save as WAV"
+                        ToolTip="Generate and save the sound session as a WAV file." />
+                <Button x:Name="GuideBtn" Content="Open Guide" Margin="5" Padding="10,5"
+                        Click="OnGuide_Click"
+                        AutomationProperties.Name="Open Guide"
+                        ToolTip="Open the CrystalCare user guide for assistance." />
+                <Button x:Name="BatchSaveBtn" Content="Batch Save" Margin="5" Padding="10,5"
+                        Click="OnBatchSave_Click"
+                        AutomationProperties.Name="Batch Save"
+                        ToolTip="Generate and save multiple tones in a selected folder." />
+                <Button x:Name="StopBtn" Content="Stop" Margin="5" Padding="10,5"
+                        IsEnabled="False"
+                        Click="OnStop_Click"
+                        AutomationProperties.Name="Stop"
+                        ToolTip="Stop the ongoing operation." />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Progress Gauge (matches Python: wx.Gauge at bottom, initially hidden) -->
+        <ProgressBar x:Name="Gauge" DockPanel.Dock="Bottom" Height="20" Margin="10"
+                     Visibility="Collapsed"
+                     AutomationProperties.Name="Progress of sound generation" />
+
+        <!-- Status messages — native Win32 EDIT control via WindowsFormsHost.
+             This gives screen readers the same behavior as wx.TextCtrl in the Python version:
+             reliable up/down arrow line navigation, proper caret tracking. -->
+        <WindowsFormsHost x:Name="StatusHost" Margin="10" Focusable="True" />
+    </DockPanel>
+</Window>

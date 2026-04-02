@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon />
+    <AssemblyName>CrystalCare</AssemblyName>
+    <Description>Sacred Frequency Healing Tone Generator</Description>
+    <Version>3.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CrystalCare.Core\CrystalCare.Core.csproj" />
+    <ProjectReference Include="..\CrystalCare.Audio\CrystalCare.Audio.csproj" />
+  </ItemGroup>
+
+</Project>

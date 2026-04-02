@@ -20,6 +20,14 @@ main.onefile-build/
 *.onefile-build/
 *.exe
 
+# .NET build artifacts
+bin/
+obj/
+publish/
+dist/
+*.user
+*.suo
+
 # Reserve (historical snapshots - git handles history now)
 reserve/
 
@@ -35,6 +43,8 @@ streaming-alignment.txt
 
 # Debug/temp files
 nul
+crystalcare_debug.log
+*.log
 
 # OS files
 Thumbs.db

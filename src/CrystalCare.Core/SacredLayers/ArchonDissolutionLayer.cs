@@ -1,0 +1,90 @@
+using CrystalCare.Core.Frequencies;
+using CrystalCare.Core.Noise;
+
+namespace CrystalCare.Core.SacredLayers;
+
+/// <summary>
+/// Archon Dissolution Layer — 3rd sacred layer.
+///
+/// Targeted mercy frequencies for each of the 7 planetary Archons.
+/// Uses the AEG pattern: Acknowledge, Elevate, Ground.
+///
+/// - Acknowledge: planetary frequency (recognition)
+/// - Elevate: PHI harmonic above (transformation toward Pleroma)
+/// - Ground: nearest Schumann harmonic (Earth's truth)
+///
+/// Scale: 0.000225 (sub-perceptual)
+/// Fade: 50 seconds (longest, for deepest layer)
+/// Breath: 12% at 0.008 Hz (~125 second cycle)
+///
+/// Port of AudioProcessor.archon_dissolution_layer_chunk() from SoundGenerator.py.
+/// </summary>
+public sealed class ArchonDissolutionLayer : ISacredLayer
+{
+    private readonly ThreadLocal<Simplex5D> _simplex = new(() => new Simplex5D(Random.Shared.Next(100)));
+
+    public float[] ComputeChunk(ReadOnlySpan<float> tChunk, float totalDuration)
+    {
+        if (totalDuration < 30f)
+            return new float[tChunk.Length];
+
+        var simplex = _simplex.Value!;
+        int n = tChunk.Length;
+        var archonFreqs = SacredConstants.ARCHON_SPHERES;
+        var pentPhases = SacredConstants.PENTAGONAL_PHASES;
+        int nArchons = archonFreqs.Length;
+
+        // Pre-compute derived frequencies
+        var elevateFreqs = new float[nArchons];
+        var groundFreqs = new float[nArchons];
+        var ampScales = new float[nArchons];
+        for (int j = 0; j < nArchons; j++)
+        {
+            elevateFreqs[j] = archonFreqs[j] * SacredConstants.PHI;
+            float divisor = MathF.Max(MathF.Round(archonFreqs[j] / SacredConstants.SCHUMANN), 1f);
+            groundFreqs[j] = archonFreqs[j] / divisor;
+            ampScales[j] = 1.0f / (1.0f + j * 0.1f);
+        }
+
+        // Sequential archon processing (memory efficient)
+        var dissolution = new float[n];
+        for (int j = 0; j < nArchons; j++)
+        {
+            float basePhase = pentPhases[j % 5];
+
+            // Phase variation from simplex
+            var tScaled = new float[n];
+            for (int i = 0; i < n; i++)
+                tScaled[i] = tChunk[i] * 0.00002f * (j + 1);
+            var phaseVar = simplex.GenerateNoise(tScaled, j, j, j, j);
+            for (int i = 0; i < n; i++)
+                phaseVar[i] *= 0.1f;
+
+            // AEG: Acknowledge + Elevate + Ground
+            for (int i = 0; i < n; i++)
+            {
+                float ack = MathF.Sin(SacredConstants.TWO_PI * archonFreqs[j] * tChunk[i] +
+                    basePhase + phaseVar[i]);
+                float elev = MathF.Sin(SacredConstants.TWO_PI * elevateFreqs[j] * tChunk[i] +
+                    basePhase * SacredConstants.PHI + phaseVar[i]);
+                float gnd = MathF.Sin(SacredConstants.TWO_PI * groundFreqs[j] * tChunk[i] +
+                    phaseVar[i] * 0.5f);
+                dissolution[i] += (0.25f * ack + 0.5f * elev + 0.25f * gnd) * ampScales[j];
+            }
+        }
+
+        // Normalize by archon count
+        for (int i = 0; i < n; i++)
+            dissolution[i] /= 7.0f;
+
+        // Fade envelope + breathing + scale
+        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 50.0f);
+        for (int i = 0; i < n; i++)
+        {
+            float breath = 0.94f + 0.06f * MathF.Sin(SacredConstants.TWO_PI * 0.008f * tChunk[i]);
+            dissolution[i] *= fade[i] * breath * 0.000225f;
+        }
+
+        return dissolution;
+    }
+}
