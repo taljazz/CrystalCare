@@ -18,7 +18,7 @@ public sealed class SoundGenerator : IDisposable
     private readonly ChaoticSelector _chaoticSelector = new();
     private readonly Random _rng = new();
 
-    public float MasterVolume { get; set; } = 0.75f;
+    public float MasterVolume { get; set; } = 0.52f;
 
     public SoundGenerator(FrequencyManager frequencyManager)
     {
@@ -39,7 +39,7 @@ public sealed class SoundGenerator : IDisposable
         bool dimensionalMode = false,
         int freqSelection = 0)
     {
-        intervalDurationList ??= [30, 45, 60, 75, 90];
+        intervalDurationList ??= [34, 55, 89, 144];
         int totalSamples = (int)(sampleRate * duration);
         int chunkSize = 3 * sampleRate; // 3-second chunks
 
