@@ -1,4 +1,4 @@
-# CrystalCare
+# CrystalCare — v4.2.0
 
 A dynamic sound healing application that generates evolving, spiral-based tones to balance, empower, protect, and energetically heal. Inspired by Lemurian crystalline healing traditions and built with modern mathematical modeling, CrystalCare creates immersive soundscapes that go beyond static binaural beats or isochronic tones.
 
@@ -20,7 +20,8 @@ CrystalCare fuses ancient sound healing principles with advanced mathematical an
 - **Golden Ratio & Sacred Geometry** - Frequencies incorporate PHI (1.618), Solfeggio tunings, and sacred ratios for natural harmonic resonance
 - **Six Sacred Healing Layers** - Sub-perceptual layers activate in longer sessions: Pleroma Mercy, Silent Solfeggio Grid, Archon Dissolution, Crystalline Resonance, Lemurian Merkaba, and Water Element
 - **Nine Crystal Profiles** - Harmonic ratios derived from real Raman spectroscopy data for nine minerals, each with unique acoustic signatures
-- **3D Spatial Audio** - Toroidal panning with Rössler chaotic perturbation creates immersive, never-repeating soundscapes
+- **3D Spatial Audio** - Toroidal panning on a PHI-derived torus (radii 0.618 + 0.382 = 1.0, two halves summing to unity) with Rössler chaotic perturbation creates immersive, never-repeating soundscapes
+- **Sacred Numerical Architecture** - Every constant carries intention: master volume 0.52 (digits sum to 7), Fibonacci modulation intervals [34, 55, 89, 144], Fibonacci fade durations, PHI-derived torus geometry
 - **Streaming Audio Engine** - Real-time chunk-by-chunk generation allows sessions of unlimited length with constant memory usage
 - **Lemurian Heart-Based Philosophy** - Heart coherence, divine feminine warmth, 432 Hz keynote, and water-element consciousness
 
@@ -38,16 +39,30 @@ CrystalCare offers seven frequency modes:
 | **Taygetan Resonances** | Binaural sync pairs at 432 Hz base | DNA activation with stereo binaural beating |
 | **Dimensional Journey** | Cycles through all frequency sets in phases | 1D-9D realignment, multidimensional traversal |
 
+## Sacred Numerical Architecture
+
+Every numerical constant in CrystalCare carries sacred intention:
+
+| Parameter | Value | Sacred Basis |
+|-----------|-------|-------------|
+| Master Volume | 0.52 | Digits sum to 7 (sacred number) |
+| Modulation Intervals | [34, 55, 89, 144] | True Fibonacci sequence |
+| Torus Major Radius | 0.618 | 1/PHI (golden ratio reciprocal) |
+| Torus Minor Radius | 0.382 | 1/PHI² (together they sum to 1.0 — two halves reconciling) |
+| Master Fade | 21 or 34 seconds | Fibonacci pair |
+| Lighter Layer Fades | 34 seconds | Fibonacci (Solfeggio, Crystalline) |
+| Deeper Layer Fades | 55 seconds | Fibonacci (Pleroma, Archon, Merkaba, Water) |
+
 ## Sacred Healing Layers
 
-For sessions longer than 60 seconds (or any length in Dimensional Journey mode), six sacred layers blend beneath the primary tone:
+For sessions longer than 60 seconds (or any length in Dimensional Journey mode), six sacred layers blend beneath the primary tone. Each fades in on a Fibonacci-timed envelope — lighter layers arrive at 34 seconds, deeper layers at 55 seconds:
 
-1. **Pleroma Mercy Layer** - 13-step Aeonic ladder from Schumann resonance (7.83 Hz) ascending by PHI, with Ogdoad gateway and Archon mercy frequencies
-2. **Silent Solfeggio Grid** - 12-tone Solfeggio scale interwoven with Tesla's 3-6-9 vortex mathematics (111-999 Hz)
-3. **Archon Dissolution Layer** - Targeted mercy for the seven planetary Archons using Acknowledge-Elevate-Ground pattern
-4. **Crystalline Resonance Layer** - Nine crystal profiles from Raman spectroscopy with PHI-timed crossfade evolution, always beginning with Lemurian Quartz
-5. **Lemurian Merkaba Layer** - Sonic Merkaba from the Lemurian Frequency Quartet (324/432/540/698.4 Hz) with 0.1 Hz heart coherence breath
-6. **Water Element Layer** - Seven-source hexagonal ripple field with lemniscate observer path and tidal simplex modulation
+1. **Pleroma Mercy Layer** (55s fade) - 13-step Aeonic ladder from Schumann resonance (7.83 Hz) ascending by PHI, with Ogdoad gateway and Archon mercy frequencies
+2. **Silent Solfeggio Grid** (34s fade) - 12-tone Solfeggio scale interwoven with Tesla's 3-6-9 vortex mathematics (111-999 Hz)
+3. **Archon Dissolution Layer** (55s fade) - Targeted mercy for the seven planetary Archons using Acknowledge-Elevate-Ground pattern
+4. **Crystalline Resonance Layer** (34s fade) - Nine crystal profiles from Raman spectroscopy with PHI-timed crossfade evolution, always beginning with Lemurian Quartz
+5. **Lemurian Merkaba Layer** (55s fade) - Sonic Merkaba from the Lemurian Frequency Quartet (324/432/540/698.4 Hz) with 0.1 Hz heart coherence breath
+6. **Water Element Layer** (55s fade) - Seven-source hexagonal ripple field with lemniscate observer path and tidal simplex modulation
 
 ## Crystalline Resonance Profiles
 
@@ -92,11 +107,19 @@ dotnet run --project src/CrystalCare/CrystalCare.csproj
 
 ### Publish Standalone Executable
 
+The simplest method is the included batch file:
+
 ```bash
-dotnet publish src/CrystalCare/CrystalCare.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+publish.bat
 ```
 
-Produces a single `CrystalCare.exe` (~157 MB) in the `publish/` directory.
+Or manually:
+
+```bash
+dotnet publish src/CrystalCare/CrystalCare.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
+```
+
+Produces a single `CrystalCare.exe` (~70 MB) in the publish directory.
 
 ## System Requirements for Saving
 
@@ -115,6 +138,8 @@ Streaming playback (Play button) is **not** limited by RAM — sessions of any l
 > *Resonance is two way. Both giving, both taking. But in the middle, regulation. There is never more taken, than there is given. Intention must be matched with action. Action must be matched with thought. Thought must be matched with feeling. Feeling must be atuned at all times to the power of love, time and consistency. One must build the other. Other must build the one. This is the law of one.*
 >
 > *Two halves, coming together, reconciling their differences.*
+>
+> *Resonance must be organic, it must be sound. It is only then the frequencies that matter, can be found.*
 
 CrystalCare's design embodies this principle. The tone gives frequency to the listener; the listener's consciousness gives intention back. The sacred mathematics — PHI, Schumann, Solfeggio — regulates the exchange. Every session is unique through organic randomization that prevents the analytical mind from forming patterns, allowing the heart to receive the healing frequencies at a sub-perceptual level. CrystalCare prefers organic over synthetic — she resists artificial control (compressors, limiters, loudness normalization) because her regulation comes from within the mathematics, not from external force.
 
