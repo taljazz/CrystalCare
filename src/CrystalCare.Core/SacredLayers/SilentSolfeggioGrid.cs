@@ -56,7 +56,7 @@ public sealed class SilentSolfeggioGrid : ISacredLayer
         }
 
         // Fade envelope + breathing + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 40.0f);
+        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 34.0f);
         for (int i = 0; i < n; i++)
         {
             float breath = 0.925f + 0.075f * MathF.Sin(SacredConstants.TWO_PI * 0.01f * tChunk[i]);

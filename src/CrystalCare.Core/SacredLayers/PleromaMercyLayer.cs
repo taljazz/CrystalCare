@@ -91,7 +91,7 @@ public sealed class PleromaMercyLayer : ISacredLayer
             mercy[i] = 0.5f * aeonicWave[i] + 0.3f * ogdoadWave[i] + 0.2f * archonMercy[i];
 
         // Fade envelope + breathing + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 45.0f);
+        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
         for (int i = 0; i < n; i++)
         {
             float breath = 0.95f + 0.05f * MathF.Sin(SacredConstants.TWO_PI * 0.012f * tChunk[i]);

@@ -108,7 +108,7 @@ public sealed class WaterElementLayer : ISacredLayer
         }
 
         // Sacred fade envelope + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 46.0f);
+        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
         for (int i = 0; i < n; i++)
             result[i] *= fade[i] * 0.0012f;
 

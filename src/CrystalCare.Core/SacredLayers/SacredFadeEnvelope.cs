@@ -13,7 +13,7 @@ public static class SacredFadeEnvelope
     /// Compute fade envelope for a chunk using absolute time positions.
     /// </summary>
     public static float[] Compute(ReadOnlySpan<float> tChunk, float totalDuration,
-        float fadeSeconds = 45.0f)
+        float fadeSeconds = 55.0f)
     {
         var envelope = new float[tChunk.Length];
 

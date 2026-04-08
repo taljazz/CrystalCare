@@ -61,7 +61,7 @@ public sealed class LemurianMerkabaLayer : ISacredLayer
         }
 
         // Sacred fade envelope + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 48.0f);
+        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
         for (int i = 0; i < n; i++)
             merkaba[i] *= fade[i] * 0.0006f;
 

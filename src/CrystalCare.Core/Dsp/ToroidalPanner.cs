@@ -50,8 +50,8 @@ public static class ToroidalPanner
         Simplex5D? panSimplex,
         Span<float> gainLeft, Span<float> gainRight)
     {
-        const float R = 1.0f;    // Major torus radius
-        const float r = 0.3f;    // Minor torus radius
+        const float R = 1.0f;      // Major torus radius
+        const float r = 0.382f;   // 1/PHI² — sacred minor radius
         float piOver4 = MathF.PI / 4.0f;
 
         for (int i = 0; i < tChunk.Length; i++)

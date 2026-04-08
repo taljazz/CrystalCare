@@ -65,8 +65,8 @@ public sealed class SoundGenerator : IDisposable
         // Toroidal panning parameters
         float torusThetaFreq = (float)(_rng.NextDouble() * 0.01 + 0.01);
         float torusPhiFreq = torusThetaFreq * SacredConstants.PHI;
-        const float torusR = 0.6f;
-        const float torusRSmall = 0.3f;
+        const float torusR = 0.618f;      // 1/PHI — golden ratio reciprocal
+        const float torusRSmall = 0.382f;  // 1/PHI² — two halves sum to 1.0
 
         // Dedicated Simplex instances
         var simplexEnvelope = new Simplex5D(42);
@@ -82,7 +82,7 @@ public sealed class SoundGenerator : IDisposable
         float noiseScaleLeft = (float)(_rng.NextDouble() * 0.02 + 0.04);
         float noiseScaleRight = (float)(_rng.NextDouble() * 0.02 + 0.04);
         float noiseOffsetRight = (float)(_rng.NextDouble() * 0.014 + 0.001);
-        int fadeDuration = _rng.Next(2) == 0 ? 15 : 30;
+        int fadeDuration = _rng.Next(2) == 0 ? 21 : 34; // Fibonacci pair
         int fadeSamples = fadeDuration * sampleRate;
         if (2 * fadeSamples > totalSamples) fadeSamples = totalSamples / 2;
 

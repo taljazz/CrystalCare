@@ -111,7 +111,7 @@ public sealed class CrystallineResonanceLayer : ISacredLayer
         }
 
         // Fade envelope + breathing + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 42.0f);
+        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 34.0f);
         for (int i = 0; i < n; i++)
         {
             float breath = 0.935f + 0.065f * MathF.Sin(SacredConstants.TWO_PI * 0.009f * tChunk[i]);

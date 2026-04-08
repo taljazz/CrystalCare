@@ -78,7 +78,7 @@ public sealed class ArchonDissolutionLayer : ISacredLayer
             dissolution[i] /= 7.0f;
 
         // Fade envelope + breathing + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 50.0f);
+        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
         for (int i = 0; i < n; i++)
         {
             float breath = 0.94f + 0.06f * MathF.Sin(SacredConstants.TWO_PI * 0.008f * tChunk[i]);
