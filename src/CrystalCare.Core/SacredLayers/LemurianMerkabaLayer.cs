@@ -1,5 +1,5 @@
+using CrystalCare.Core.Dsp;
 using CrystalCare.Core.Frequencies;
-using CrystalCare.Core.Noise;
 
 namespace CrystalCare.Core.SacredLayers;
 
@@ -13,24 +13,22 @@ namespace CrystalCare.Core.SacredLayers;
 /// PHI-weighted amplitudes: keynote strongest, transcendence most subtle.
 /// Heart coherence breath at 0.1 Hz (10-second cycle — HeartMath rhythm).
 ///
-/// Fully stateless: no state carried between chunks.
-///
 /// Scale: 0.0006
-/// Fade: 48 seconds
-///
-/// Port of AudioProcessor.lemurian_merkaba_layer_chunk() from SoundGenerator.py.
+/// Fade: 55 seconds (Fibonacci)
 /// </summary>
-public sealed class LemurianMerkabaLayer : ISacredLayer
+public sealed class LemurianMerkabaLayer : SacredLayerBase
 {
-    private readonly ThreadLocal<Simplex5D> _simplex = new(() => new Simplex5D(Random.Shared.Next(100)));
+    protected override float FadeSeconds => 55.0f;
+    protected override float BreathCenter => 0.975f;
+    protected override float BreathDepth => 0.025f;
+    protected override float BreathFreq => 0.1f;
+    protected override float OutputScale => 0.0006f;
+    protected override bool BreathBeforeFade => true;
 
-    public float[] ComputeChunk(ReadOnlySpan<float> tChunk, float totalDuration)
+    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+        float totalDuration, int n)
     {
-        if (totalDuration < 60f)
-            return new float[tChunk.Length];
-
-        var simplex = _simplex.Value!;
-        int n = tChunk.Length;
+        var simplex = Simplex.Value!;
 
         // Organic phase wobble from simplex noise
         var tScaled = new float[n];
@@ -53,17 +51,11 @@ public sealed class LemurianMerkabaLayer : ISacredLayer
                     SacredConstants.TWO_PI * freqs[f] * tChunk[i] + phases[f] + wobble[i]);
         }
 
-        // Heart coherence breath at 0.1 Hz (HeartMath)
+        // Flower of Life geometric modulation — sacred geometry enriching the Merkaba
+        var flowerRatios = FrequencyManager.FlowerOfLifeRatios.Values.ToArray();
+        var geoMod = GeometricModulator.ComputeChunk(tChunk, flowerRatios, 0.0006f);
         for (int i = 0; i < n; i++)
-        {
-            float breath = 0.975f + 0.025f * MathF.Sin(SacredConstants.TWO_PI * 0.1f * tChunk[i]);
-            merkaba[i] *= breath;
-        }
-
-        // Sacred fade envelope + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
-        for (int i = 0; i < n; i++)
-            merkaba[i] *= fade[i] * 0.0006f;
+            merkaba[i] *= (1.0f + geoMod[i]);
 
         return merkaba;
     }

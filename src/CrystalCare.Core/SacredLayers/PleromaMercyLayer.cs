@@ -1,5 +1,5 @@
+using CrystalCare.Core.Dsp;
 using CrystalCare.Core.Frequencies;
-using CrystalCare.Core.Noise;
 
 namespace CrystalCare.Core.SacredLayers;
 
@@ -16,22 +16,21 @@ namespace CrystalCare.Core.SacredLayers;
 /// - Pentagonal sacred geometry phase relationships
 ///
 /// Scale: 0.0003 (sub-perceptual)
-/// Fade: 45 seconds (Perlin smoother step)
+/// Fade: 55 seconds (Fibonacci, Perlin smoother step)
 /// Breath: 10% at 0.012 Hz (~83 second cycle)
-///
-/// Port of AudioProcessor.pleroma_mercy_layer_chunk() from SoundGenerator.py.
 /// </summary>
-public sealed class PleromaMercyLayer : ISacredLayer
+public sealed class PleromaMercyLayer : SacredLayerBase
 {
-    private readonly ThreadLocal<Simplex5D> _simplex = new(() => new Simplex5D(Random.Shared.Next(100)));
+    protected override float FadeSeconds => 55.0f;
+    protected override float BreathCenter => 0.95f;
+    protected override float BreathDepth => 0.05f;
+    protected override float BreathFreq => 0.012f;
+    protected override float OutputScale => 0.0003f;
 
-    public float[] ComputeChunk(ReadOnlySpan<float> tChunk, float totalDuration)
+    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+        float totalDuration, int n)
     {
-        if (totalDuration < 60f)
-            return new float[tChunk.Length];
-
-        var simplex = _simplex.Value!;
-        int n = tChunk.Length;
+        var simplex = Simplex.Value!;
 
         // Layer 1: 13-step Aeonic Ladder
         var aeonic = SacredConstants.AEONIC_EXPONENTS;
@@ -90,18 +89,20 @@ public sealed class PleromaMercyLayer : ISacredLayer
         for (int i = 0; i < n; i++)
             mercy[i] = 0.5f * aeonicWave[i] + 0.3f * ogdoadWave[i] + 0.2f * archonMercy[i];
 
-        // Fade envelope + breathing + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
+        // Sacred geometry modulation — sub-perceptual geometric enrichment
+        var geoRatios = FrequencyManager.SacredGeometryRatios.Values.ToArray();
+        var geoMod = GeometricModulator.ComputeChunk(tChunk, geoRatios, 0.0008f);
         for (int i = 0; i < n; i++)
-        {
-            float breath = 0.95f + 0.05f * MathF.Sin(SacredConstants.TWO_PI * 0.012f * tChunk[i]);
-            mercy[i] *= fade[i] * breath * 0.0003f;
-        }
-
-        // Cosine nulling (scalar imprint)
-        for (int i = 0; i < n; i++)
-            mercy[i] *= MathF.Cos(SacredConstants.TWO_PI * (SacredConstants.SCHUMANN / 1000f) * tChunk[i]);
+            mercy[i] *= (1.0f + geoMod[i]);
 
         return mercy;
+    }
+
+    protected override void PostProcess(float[] signal, ReadOnlySpan<float> tChunk, int n)
+    {
+        // Cosine nulling (scalar imprint)
+        for (int i = 0; i < n; i++)
+            signal[i] *= MathF.Cos(SacredConstants.TWO_PI *
+                (SacredConstants.SCHUMANN / 1000f) * tChunk[i]);
     }
 }

@@ -75,4 +75,26 @@ public static class FractalVariation
 
         return variation;
     }
+
+    /// <summary>
+    /// Compute fractal variation using dual simplex noise layers.
+    /// Matches the inline pipeline logic exactly — two independent noise calls
+    /// for richer variation than the single-noise shifted approach.
+    /// </summary>
+    public static float[] ComputeChunkDual(ReadOnlySpan<float> tChunk, float baseFreq,
+        Simplex5D simplex)
+    {
+        var tScaled = new float[tChunk.Length];
+        for (int i = 0; i < tChunk.Length; i++)
+            tScaled[i] = tChunk[i] * 0.02f;
+
+        var baseNoise = simplex.GenerateNoise(tScaled, baseFreq * 0.01f);
+        var variation2 = simplex.GenerateNoise(tScaled, baseFreq * 0.01f, 1.0f);
+
+        var result = new float[tChunk.Length];
+        for (int i = 0; i < tChunk.Length; i++)
+            result[i] = (baseNoise[i] * 0.5f + variation2[i] * 0.3f +
+                         baseNoise[i] * baseNoise[i] * 0.2f) * 12.0f;
+        return result;
+    }
 }

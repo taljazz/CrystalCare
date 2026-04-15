@@ -14,6 +14,7 @@ public sealed class CrystalProfileLibrary
 {
     public sealed class CrystalProfile
     {
+        public required CrystalType Type { get; init; }
         public required string Name { get; init; }
         public required float[] HarmonicRatios { get; init; }
         public float[] AmplitudeWeights { get; set; } = [];
@@ -32,7 +33,7 @@ public sealed class CrystalProfileLibrary
     public CrystalProfileLibrary()
     {
         Profiles = BuildProfiles();
-        LemurianIndex = Array.FindIndex(Profiles, p => p.Name == "Lemurian Quartz");
+        LemurianIndex = Array.FindIndex(Profiles, p => p.Type == CrystalType.LemurianQuartz);
     }
 
     /// <summary>
@@ -162,25 +163,27 @@ public sealed class CrystalProfileLibrary
 
         var profiles = new[]
         {
-            new CrystalProfile { Name = "Clear Quartz", HarmonicRatios = quartzRatios,
-                SymmetryOrder = 3, PiezoFactor = 0.02f },
-            new CrystalProfile { Name = "Amethyst", HarmonicRatios = (float[])quartzRatios.Clone(),
+            new CrystalProfile { Type = CrystalType.ClearQuartz, Name = "Clear Quartz",
+                HarmonicRatios = quartzRatios, SymmetryOrder = 3, PiezoFactor = 0.02f },
+            new CrystalProfile { Type = CrystalType.Amethyst, Name = "Amethyst",
+                HarmonicRatios = (float[])quartzRatios.Clone(),
                 SymmetryOrder = 3, DetuneFactor = 0.008f, PiezoFactor = 0.02f },
-            new CrystalProfile { Name = "Rose Quartz", HarmonicRatios = roseRatios,
-                SymmetryOrder = 3, PiezoFactor = 0.02f },
-            new CrystalProfile { Name = "Citrine", HarmonicRatios = (float[])quartzRatios.Clone(),
+            new CrystalProfile { Type = CrystalType.RoseQuartz, Name = "Rose Quartz",
+                HarmonicRatios = roseRatios, SymmetryOrder = 3, PiezoFactor = 0.02f },
+            new CrystalProfile { Type = CrystalType.Citrine, Name = "Citrine",
+                HarmonicRatios = (float[])quartzRatios.Clone(),
                 SymmetryOrder = 3, DetuneFactor = 0.006f, PiezoFactor = 0.02f },
-            new CrystalProfile { Name = "Black Tourmaline", HarmonicRatios = tourmalineRatios,
-                SymmetryOrder = 3,
+            new CrystalProfile { Type = CrystalType.BlackTourmaline, Name = "Black Tourmaline",
+                HarmonicRatios = tourmalineRatios, SymmetryOrder = 3,
                 BeatingPairs = [(2, 3), (3, 4), (2, 4)], PiezoFactor = 0.025f },
-            new CrystalProfile { Name = "Selenite", HarmonicRatios = seleniteRatios,
-                SymmetryOrder = 2, BeatingPairs = [(4, 5)] },
-            new CrystalProfile { Name = "Lapis Lazuli", HarmonicRatios = lapisRatios,
-                SymmetryOrder = 4 },
-            new CrystalProfile { Name = "Crystal Singing Bowl", HarmonicRatios = bowlRatios,
-                SymmetryOrder = 1, BowlBeat = 1.8f },
-            new CrystalProfile { Name = "Lemurian Quartz", HarmonicRatios = lemurianRatios,
-                SymmetryOrder = 3, DetuneFactor = 0.003f,
+            new CrystalProfile { Type = CrystalType.Selenite, Name = "Selenite",
+                HarmonicRatios = seleniteRatios, SymmetryOrder = 2, BeatingPairs = [(4, 5)] },
+            new CrystalProfile { Type = CrystalType.LapisLazuli, Name = "Lapis Lazuli",
+                HarmonicRatios = lapisRatios, SymmetryOrder = 4 },
+            new CrystalProfile { Type = CrystalType.CrystalSingingBowl, Name = "Crystal Singing Bowl",
+                HarmonicRatios = bowlRatios, SymmetryOrder = 1, BowlBeat = 1.8f },
+            new CrystalProfile { Type = CrystalType.LemurianQuartz, Name = "Lemurian Quartz",
+                HarmonicRatios = lemurianRatios, SymmetryOrder = 3, DetuneFactor = 0.003f,
                 ShimmerRate = 1.8f, ShimmerDepth = 0.08f, PiezoFactor = 0.02f },
         };
 
@@ -203,10 +206,10 @@ public sealed class CrystalProfileLibrary
             }
 
             // Apply mineral weights for lapis and lemurian
-            float[]? mineralWeights = profile.Name switch
+            float[]? mineralWeights = profile.Type switch
             {
-                "Lapis Lazuli" => lapisMineralWeights,
-                "Lemurian Quartz" => lemurianWarmthWeights,
+                CrystalType.LapisLazuli => lapisMineralWeights,
+                CrystalType.LemurianQuartz => lemurianWarmthWeights,
                 _ => null
             };
 

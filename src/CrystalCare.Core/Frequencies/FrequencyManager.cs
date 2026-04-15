@@ -91,20 +91,20 @@ public sealed class FrequencyManager
     /// Get frequencies for a given mode selection.
     /// Returns float[] for most modes, or (float, float)[] encoded as flat array for binaural (mode 5).
     /// </summary>
-    public FrequencyResult GetFrequencies(int selection, float baseFreqInitial = 432f)
+    public FrequencyResult GetFrequencies(FrequencyMode mode, float baseFreqInitial = 432f)
     {
-        return selection switch
+        return mode switch
         {
-            0 => new FrequencyResult([174f, 396f, 417f, 528f]),                     // Solfeggio base
-            1 => new FrequencyResult([852f, 963f]),                                  // Solfeggio high
-            2 => new FrequencyResult([136.10f, 194.18f, 211.44f, 303f]),            // Planetary
-            3 => new FrequencyResult(                                                // Sacred geometry + flower of life
+            FrequencyMode.Standard => new FrequencyResult([174f, 396f, 417f, 528f]),
+            FrequencyMode.Solfeggio => new FrequencyResult([852f, 963f]),
+            FrequencyMode.Fibonacci => new FrequencyResult([136.10f, 194.18f, 211.44f, 303f]),
+            FrequencyMode.Pythagorean => new FrequencyResult(
                 GetGeometricFrequencySet(baseFreqInitial, SacredGeometryRatios)
                 .Concat(GetGeometricFrequencySet(baseFreqInitial, FlowerOfLifeRatios))
                 .ToArray()),
-            4 => new FrequencyResult(                                                // Triple helix
+            FrequencyMode.TripleHelixDna => new FrequencyResult(
                 GetGeometricFrequencySet(baseFreqInitial, TripleHelixRatios)),
-            5 => CreateTaygetanBinaural(baseFreqInitial),                            // Taygetan binaural
+            FrequencyMode.TaygetanBinaural => CreateTaygetanBinaural(baseFreqInitial),
             _ => new FrequencyResult(Array.Empty<float>()),
         };
     }

@@ -1,6 +1,5 @@
 using CrystalCare.Core.Dsp;
 using CrystalCare.Core.Frequencies;
-using CrystalCare.Core.Noise;
 
 namespace CrystalCare.Core.SacredLayers;
 
@@ -12,17 +11,20 @@ namespace CrystalCare.Core.SacredLayers;
 /// PHI-timed crossfade evolution between crystal types.
 ///
 /// Scale: 0.0009
-/// Fade: 42 seconds
+/// Fade: 34 seconds (Fibonacci)
 /// Breath: 13% at 0.009 Hz
-///
-/// Port of AudioProcessor.crystalline_resonance_layer_chunk() from SoundGenerator.py.
 /// </summary>
-public sealed class CrystallineResonanceLayer : ISacredLayer
+public sealed class CrystallineResonanceLayer : SacredLayerBase
 {
     private readonly CrystalProfileLibrary _crystalLib;
     private readonly int[] _crystalSequence;
     private readonly float _baseFreq;
-    private readonly ThreadLocal<Simplex5D> _simplex = new(() => new Simplex5D(Random.Shared.Next(100)));
+
+    protected override float FadeSeconds => 34.0f;
+    protected override float BreathCenter => 0.935f;
+    protected override float BreathDepth => 0.065f;
+    protected override float BreathFreq => 0.009f;
+    protected override float OutputScale => 0.0009f;
 
     public CrystallineResonanceLayer(CrystalProfileLibrary crystalLib,
         int[] crystalSequence, float baseFreq)
@@ -32,13 +34,10 @@ public sealed class CrystallineResonanceLayer : ISacredLayer
         _baseFreq = baseFreq;
     }
 
-    public float[] ComputeChunk(ReadOnlySpan<float> tChunk, float totalDuration)
+    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+        float totalDuration, int n)
     {
-        if (totalDuration < 60f)
-            return new float[tChunk.Length];
-
-        var simplex = _simplex.Value!;
-        int n = tChunk.Length;
+        var simplex = Simplex.Value!;
         var profiles = _crystalLib.Profiles;
         int numProfiles = profiles.Length;
 
@@ -89,6 +88,11 @@ public sealed class CrystallineResonanceLayer : ISacredLayer
             // Generate crystal harmonics for this segment
             var wave = CrystalProfileLibrary.GenerateHarmonics(tSeg, _baseFreq, profile, simplex);
 
+            // Fractal micro-variation: subtle organic aliveness (0.1% modulation)
+            var microVar = FractalVariation.ComputeChunk(tSeg, _baseFreq, simplex);
+            for (int i = 0; i < segLen; i++)
+                wave[i] *= (1.0f + microVar[i] * 0.001f);
+
             // Crossfade weights
             for (int i = 0; i < segLen; i++)
             {
@@ -108,14 +112,6 @@ public sealed class CrystallineResonanceLayer : ISacredLayer
 
                 result[firstIdx + i] += wave[i] * weight;
             }
-        }
-
-        // Fade envelope + breathing + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 34.0f);
-        for (int i = 0; i < n; i++)
-        {
-            float breath = 0.935f + 0.065f * MathF.Sin(SacredConstants.TWO_PI * 0.009f * tChunk[i]);
-            result[i] *= fade[i] * breath * 0.0009f;
         }
 
         return result;

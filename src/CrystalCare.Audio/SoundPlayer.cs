@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using CrystalCare.Core.Frequencies;
 using CrystalCare.Core.Generation;
 using NAudio.Wave;
 
@@ -27,8 +28,7 @@ public sealed class SoundPlayer : IDisposable
         int sampleRate, CancellationToken ct,
         Action<string>? updateStatus = null,
         Action<float>? updateProgress = null,
-        bool dimensionalMode = false,
-        int freqSelection = 0)
+        FrequencyMode freqMode = FrequencyMode.Standard)
     {
         var chunkQueue = new BlockingCollection<float[,]>(boundedCapacity: 4);
 
@@ -40,8 +40,7 @@ public sealed class SoundPlayer : IDisposable
                 foreach (var chunk in _generator.GenerateStream(
                     duration, baseFreq, sampleRate,
                     ct: ct, updateProgress: updateProgress,
-                    dimensionalMode: dimensionalMode,
-                    freqSelection: freqSelection))
+                    freqMode: freqMode))
                 {
                     if (ct.IsCancellationRequested) break;
                     chunkQueue.Add(chunk, ct);
@@ -100,8 +99,7 @@ public sealed class SoundPlayer : IDisposable
         int sampleRate, CancellationToken ct,
         Action<string>? updateStatus = null,
         Action<float>? updateProgress = null,
-        bool dimensionalMode = false,
-        int freqSelection = 0)
+        FrequencyMode freqMode = FrequencyMode.Standard)
     {
         await Task.Run(() =>
         {
@@ -109,7 +107,7 @@ public sealed class SoundPlayer : IDisposable
 
             var audioData = _generator.GenerateBatch(duration, baseFreq, sampleRate,
                 ct: ct, updateProgress: p => updateProgress?.Invoke(p * 0.8f),
-                dimensionalMode: dimensionalMode, freqSelection: freqSelection);
+                freqMode: freqMode);
 
             if (ct.IsCancellationRequested) return;
 

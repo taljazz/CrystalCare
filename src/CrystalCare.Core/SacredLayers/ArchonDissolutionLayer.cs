@@ -1,5 +1,4 @@
 using CrystalCare.Core.Frequencies;
-using CrystalCare.Core.Noise;
 
 namespace CrystalCare.Core.SacredLayers;
 
@@ -9,27 +8,23 @@ namespace CrystalCare.Core.SacredLayers;
 /// Targeted mercy frequencies for each of the 7 planetary Archons.
 /// Uses the AEG pattern: Acknowledge, Elevate, Ground.
 ///
-/// - Acknowledge: planetary frequency (recognition)
-/// - Elevate: PHI harmonic above (transformation toward Pleroma)
-/// - Ground: nearest Schumann harmonic (Earth's truth)
-///
 /// Scale: 0.000225 (sub-perceptual)
-/// Fade: 50 seconds (longest, for deepest layer)
+/// Fade: 55 seconds (Fibonacci)
 /// Breath: 12% at 0.008 Hz (~125 second cycle)
-///
-/// Port of AudioProcessor.archon_dissolution_layer_chunk() from SoundGenerator.py.
 /// </summary>
-public sealed class ArchonDissolutionLayer : ISacredLayer
+public sealed class ArchonDissolutionLayer : SacredLayerBase
 {
-    private readonly ThreadLocal<Simplex5D> _simplex = new(() => new Simplex5D(Random.Shared.Next(100)));
+    protected override float MinDuration => 30f;
+    protected override float FadeSeconds => 55.0f;
+    protected override float BreathCenter => 0.94f;
+    protected override float BreathDepth => 0.06f;
+    protected override float BreathFreq => 0.008f;
+    protected override float OutputScale => 0.000225f;
 
-    public float[] ComputeChunk(ReadOnlySpan<float> tChunk, float totalDuration)
+    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+        float totalDuration, int n)
     {
-        if (totalDuration < 30f)
-            return new float[tChunk.Length];
-
-        var simplex = _simplex.Value!;
-        int n = tChunk.Length;
+        var simplex = Simplex.Value!;
         var archonFreqs = SacredConstants.ARCHON_SPHERES;
         var pentPhases = SacredConstants.PENTAGONAL_PHASES;
         int nArchons = archonFreqs.Length;
@@ -76,14 +71,6 @@ public sealed class ArchonDissolutionLayer : ISacredLayer
         // Normalize by archon count
         for (int i = 0; i < n; i++)
             dissolution[i] /= 7.0f;
-
-        // Fade envelope + breathing + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
-        for (int i = 0; i < n; i++)
-        {
-            float breath = 0.94f + 0.06f * MathF.Sin(SacredConstants.TWO_PI * 0.008f * tChunk[i]);
-            dissolution[i] *= fade[i] * breath * 0.000225f;
-        }
 
         return dissolution;
     }

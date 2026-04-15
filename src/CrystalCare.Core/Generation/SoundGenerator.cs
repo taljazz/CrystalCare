@@ -11,7 +11,7 @@ namespace CrystalCare.Core.Generation;
 /// Two modes: streaming (GenerateStream) for playback, batch (GenerateBatch) for saves.
 /// Port of SoundGenerator class from SoundGenerator.py.
 /// </summary>
-public sealed class SoundGenerator : IDisposable
+public sealed partial class SoundGenerator
 {
     private readonly FrequencyManager _frequencyManager;
     private readonly CrystalProfileLibrary _crystalLibrary;
@@ -36,10 +36,10 @@ public sealed class SoundGenerator : IDisposable
         int[]? intervalDurationList = null,
         CancellationToken ct = default,
         Action<float>? updateProgress = null,
-        bool dimensionalMode = false,
-        int freqSelection = 0)
+        FrequencyMode freqMode = FrequencyMode.Standard)
     {
         intervalDurationList ??= [34, 55, 89, 144];
+        bool dimensionalMode = freqMode == FrequencyMode.DimensionalShift;
         int totalSamples = (int)(sampleRate * duration);
         int chunkSize = 3 * sampleRate; // 3-second chunks
 
@@ -74,8 +74,8 @@ public sealed class SoundGenerator : IDisposable
         var simplexPan = new Simplex5D(13);
 
         // Taygetan binaural mode detection
-        bool hasTaygetan = freqSelection == 5;
-        var tayFreqResult = hasTaygetan ? _frequencyManager.GetFrequencies(5) : null;
+        bool hasTaygetan = freqMode == FrequencyMode.TaygetanBinaural;
+        var tayFreqResult = hasTaygetan ? _frequencyManager.GetFrequencies(FrequencyMode.TaygetanBinaural) : null;
         var tayPairs = tayFreqResult?.BinauralPairs;
 
         // Noise and fade parameters
@@ -145,11 +145,14 @@ public sealed class SoundGenerator : IDisposable
         // Sacred layer toroidal panning frequencies (slow, independent per layer)
         float[] sacredThetaFreqs = [0.003f, 0.005f, 0.004f, 0.0035f, 0.0028f, 0.0045f];
         float[] sacredPhiFreqs = sacredThetaFreqs.Select(f => f * SacredConstants.PHI).ToArray();
-        const float sacredR = 0.6f;
-        const float sacredRSmall = 0.3f;
+        const float sacredR = 0.618f;      // 1/PHI — matches main torus
+        const float sacredRSmall = 0.382f;  // 1/PHI² — two halves sum to 1.0
 
         // --- Normalization: estimate peak ---
         float normGain = EstimateNormGain(allFrequencies, modDepths, lfoLeftParams, sampleRate);
+
+        // ========== PRE-ALLOCATE BUFFER POOL ==========
+        var pool = new ChunkBufferPool(chunkSize);
 
         // ========== PER-CHUNK LOOP ==========
         int numChunks = (totalSamples + chunkSize - 1) / chunkSize;
@@ -161,9 +164,12 @@ public sealed class SoundGenerator : IDisposable
             int chunkOffset = chunkIdx * chunkSize;
             int chunkSamples = global::System.Math.Min(chunkSize, totalSamples - chunkOffset);
 
+            // Clear pooled buffers for this chunk
+            pool.Clear(chunkSamples);
+
             // Time array for this chunk
             float tStart = (float)chunkOffset / sampleRate;
-            var tChunk = new float[chunkSamples];
+            var tChunk = pool.TChunk;
             for (int i = 0; i < chunkSamples; i++)
                 tChunk[i] = tStart + (float)i / sampleRate;
 
@@ -171,18 +177,7 @@ public sealed class SoundGenerator : IDisposable
             var modulation = ComputeModulationChunk(tChunk, chunkOffset, chunkSamples, schedule);
 
             // --- Stage 2: Fractal variation ---
-            var tScaled = new float[chunkSamples];
-            for (int i = 0; i < chunkSamples; i++)
-                tScaled[i] = tChunk[i] * 0.02f;
-
-            var baseNoise = simplexFractal.GenerateNoise(tScaled, baseFreq * 0.01f);
-            var variation2 = simplexFractal.GenerateNoise(tScaled, baseFreq * 0.01f, 1.0f);
-            var fractalVar = new float[chunkSamples];
-            for (int i = 0; i < chunkSamples; i++)
-            {
-                fractalVar[i] = (baseNoise[i] * 0.5f + variation2[i] * 0.3f +
-                                  baseNoise[i] * baseNoise[i] * 0.2f) * 12.0f;
-            }
+            var fractalVar = FractalVariation.ComputeChunkDual(tChunk, baseFreq, simplexFractal);
 
             // --- Stage 3: f_modulated ---
             float chaoticOffset = chaoticFactor * baseFreq * 0.25f;
@@ -190,7 +185,7 @@ public sealed class SoundGenerator : IDisposable
                 modulation[i] += baseFreq + chaoticOffset + fractalVar[i];
 
             // --- Stage 4: Envelope ---
-            var envelope = new float[chunkSamples];
+            var envelope = pool.Envelope;
             OrganicAdsrEnvelope.ComputeChunk(envelope, chunkOffset, chunkSamples,
                 adsrParams, simplexEnvelope, totalSamples);
 
@@ -241,7 +236,7 @@ public sealed class SoundGenerator : IDisposable
             waveLeft = reverbLeft.ProcessChunk(waveLeft);
 
             // --- Stage 12: 12-sample right delay with carry ---
-            var waveRightDelayed = new float[chunkSamples];
+            var waveRightDelayed = pool.WaveRightDelayed;
             Array.Copy(delayBuffer, 0, waveRightDelayed, 0,
                 global::System.Math.Min(12, chunkSamples));
             if (chunkSamples > 12)
@@ -252,7 +247,7 @@ public sealed class SoundGenerator : IDisposable
 
             // --- Stage 13: Noise layers ---
             var noiseLeft = EvolvingNoiseLayer.Generate(tChunk, rng: _rng);
-            var tChunkOffset = new float[chunkSamples];
+            var tChunkOffset = pool.TChunkOffset;
             for (int i = 0; i < chunkSamples; i++)
                 tChunkOffset[i] = tChunk[i] + noiseOffsetRight;
             var noiseRight = EvolvingNoiseLayer.Generate(tChunkOffset, rng: _rng);
@@ -269,7 +264,7 @@ public sealed class SoundGenerator : IDisposable
             // --- Stage 15: Toroidal pan + Rössler ---
             ApplyToroidalPanning(waveLeft, waveRight, tChunk, chunkSamples,
                 torusThetaFreq, torusPhiFreq, torusR, torusRSmall,
-                simplexPan, rossler, panSmoother, driftFreq, driftAmplitude);
+                simplexPan, rossler, panSmoother, driftFreq, driftAmplitude, pool);
 
             // Apply master volume
             for (int i = 0; i < chunkSamples; i++)
@@ -286,9 +281,7 @@ public sealed class SoundGenerator : IDisposable
                 for (int li = 0; li < sacredLayers.Length; li++)
                 {
                     var layer = sacredLayers[li];
-                    // Capture tChunk as array for thread safety
-                    var tChunkCopy = tChunk.ToArray();
-                    sacredTasks[li] = Task.Run(() => layer.ComputeChunk(tChunkCopy, duration));
+                    sacredTasks[li] = Task.Run(() => layer.ComputeChunk(tChunk, duration));
                 }
 
                 try
@@ -341,16 +334,15 @@ public sealed class SoundGenerator : IDisposable
         int sampleRate = 48000,
         CancellationToken ct = default,
         Action<float>? updateProgress = null,
-        bool dimensionalMode = false,
-        int freqSelection = 0)
+        FrequencyMode freqMode = FrequencyMode.Standard)
     {
         int totalSamples = (int)(sampleRate * duration);
         var result = new float[totalSamples, 2];
         int offset = 0;
 
         foreach (var chunk in GenerateStream(duration, baseFreq, sampleRate,
-            ct: ct, updateProgress: updateProgress, dimensionalMode: dimensionalMode,
-            freqSelection: freqSelection))
+            ct: ct, updateProgress: updateProgress,
+            freqMode: freqMode))
         {
             int samples = chunk.GetLength(0);
             int toCopy = global::System.Math.Min(samples, totalSamples - offset);
@@ -365,216 +357,4 @@ public sealed class SoundGenerator : IDisposable
         return result;
     }
 
-    // ========== HELPER METHODS ==========
-
-    private float[] BuildFrequencySet(float baseFreq)
-    {
-        var freqs = new List<float>();
-
-        // 6 PHI exponents
-        for (int i = 0; i < 6; i++)
-            freqs.Add(baseFreq * SacredConstants.PHI_EXPONENTS_6[i] *
-                (float)(_rng.NextDouble() * 0.04 + 0.98));
-
-        // 3 ratio-1.3 exponents
-        for (int i = 0; i < 3; i++)
-            freqs.Add(baseFreq * SacredConstants.RATIO_1_3_EXPONENTS_3[i] *
-                (float)(_rng.NextDouble() * 0.04 + 0.98));
-
-        // 4 subharmonics
-        for (int i = 0; i < 4; i++)
-            freqs.Add(baseFreq / SacredConstants.SUBHARMONIC_DIVISORS[i] *
-                (float)(_rng.NextDouble() * 0.1 + 0.95));
-
-        return freqs.ToArray();
-    }
-
-    private List<(int start, int end, float[] ratioValues, float modIndex)>
-        BuildModulationSchedule(float duration, int totalSamples, int sampleRate,
-            int[] intervalDurations, bool dimensionalMode, CancellationToken ct)
-    {
-        var schedule = new List<(int, int, float[], float)>();
-        int current = 0;
-
-        if (dimensionalMode)
-        {
-            int[] phases = [0, 2, 1, 3, 4, 3, 5];
-            int phaseLen = totalSamples / (phases.Length + 1);
-            foreach (int sel in phases)
-            {
-                if (ct.IsCancellationRequested) break;
-                var ratioSet = _frequencyManager.SelectRandomRatioSet(ct);
-                float modIndex = (float)(_rng.NextDouble() * 0.05 + 0.2);
-                int end = global::System.Math.Min(current + phaseLen, totalSamples);
-                schedule.Add((current, end, ratioSet.Values.ToArray(), modIndex));
-                current = end;
-            }
-            // 'all' phase
-            if (current < totalSamples)
-            {
-                var allRatios = FrequencyManager.RatioSets.Values
-                    .SelectMany(d => d.Values).Distinct().ToArray();
-                float modIndex = (float)(_rng.NextDouble() * 0.05 + 0.2);
-                schedule.Add((current, totalSamples, allRatios, modIndex));
-            }
-        }
-        else
-        {
-            float remaining = duration;
-            int intervalCount = 0;
-            while (remaining > 0 && !ct.IsCancellationRequested)
-            {
-                float interval = global::System.Math.Min(
-                    intervalDurations[intervalCount % intervalDurations.Length], remaining);
-                int segSamples = (int)(sampleRate * interval);
-                var ratioSet = _frequencyManager.SelectRandomRatioSet(ct);
-                float modIndex = (float)(_rng.NextDouble() * 0.05 + 0.2);
-                int end = global::System.Math.Min(current + segSamples, totalSamples);
-                schedule.Add((current, end, ratioSet.Values.ToArray(), modIndex));
-                current = end;
-                remaining -= interval;
-                intervalCount++;
-            }
-        }
-
-        return schedule;
-    }
-
-    private static float[] ComputeModulationChunk(ReadOnlySpan<float> tChunk,
-        int chunkOffset, int chunkSamples,
-        List<(int start, int end, float[] ratioValues, float modIndex)> schedule)
-    {
-        var result = new float[chunkSamples];
-        int chunkEnd = chunkOffset + chunkSamples;
-
-        foreach (var (start, end, ratioValues, modIndex) in schedule)
-        {
-            if (start >= chunkEnd || end <= chunkOffset) continue;
-
-            int localStart = global::System.Math.Max(0, start - chunkOffset);
-            int localEnd = global::System.Math.Min(chunkSamples, end - chunkOffset);
-
-            for (int r = 0; r < ratioValues.Length; r++)
-            {
-                float ratio = ratioValues[r];
-                for (int i = localStart; i < localEnd; i++)
-                    result[i] += modIndex * MathF.Sin(SacredConstants.TWO_PI * ratio * tChunk[i]);
-            }
-        }
-
-        return result;
-    }
-
-    private float EstimateNormGain(float[] frequencies, float[] modDepths,
-        MicrotonalLfo.LfoParams lfoParams, int sampleRate)
-    {
-        int estSamples = global::System.Math.Min(sampleRate / 2, 24000);
-        float quarterPeriod = 1.0f / (4.0f * MathF.Max(lfoParams.Lfo1Freq, 0.001f));
-
-        var estT = new float[estSamples];
-        for (int i = 0; i < estSamples; i++)
-            estT[i] = quarterPeriod + (float)i / sampleRate;
-
-        var estEnv = new float[estSamples];
-        Array.Fill(estEnv, 1.0f);
-        var estLfo = MicrotonalLfo.Compute(estT, lfoParams);
-        var estWave = HarmonicGenerator.GenerateHarmonics(estT, frequencies, estEnv, estLfo, modDepths);
-        WaveShaper.Process(estWave, 2.5f);
-
-        float peak = 0.001f;
-        for (int i = 0; i < estSamples; i++)
-            peak = MathF.Max(peak, MathF.Abs(estWave[i]));
-
-        return 1.0f / (peak * 1.3f);
-    }
-
-    private static void ApplyFade(float[] waveLeft, float[] waveRight,
-        int chunkOffset, int chunkSamples, int fadeSamples, int totalSamples)
-    {
-        // Fade in
-        if (chunkOffset < fadeSamples)
-        {
-            int fadeEnd = global::System.Math.Min(chunkSamples, fadeSamples - chunkOffset);
-            for (int i = 0; i < fadeEnd; i++)
-            {
-                float t = (float)(chunkOffset + i) / fadeSamples;
-                float fade = MathF.Pow(t, 1.5f);
-                waveLeft[i] *= fade;
-                waveRight[i] *= fade;
-            }
-        }
-
-        // Fade out
-        int fadeOutStart = totalSamples - fadeSamples;
-        if (chunkOffset + chunkSamples > fadeOutStart)
-        {
-            int startIdx = global::System.Math.Max(0, fadeOutStart - chunkOffset);
-            for (int i = startIdx; i < chunkSamples; i++)
-            {
-                float remaining = (float)(totalSamples - (chunkOffset + i)) / fadeSamples;
-                float fade = global::System.Math.Clamp(MathF.Pow(remaining, 1.5f), 0f, 1f);
-                waveLeft[i] *= fade;
-                waveRight[i] *= fade;
-            }
-        }
-    }
-
-    private static void ApplyToroidalPanning(float[] waveLeft, float[] waveRight,
-        ReadOnlySpan<float> tChunk, int chunkSamples,
-        float thetaFreq, float phiFreq, float R, float r,
-        Simplex5D simplexPan, Math.RosslerAttractor.Trajectory rossler,
-        ExponentialSmoother panSmoother, float driftFreq, float driftAmp)
-    {
-        var panCurve = new float[chunkSamples];
-
-        var tScaled1 = new float[chunkSamples];
-        var tScaled2 = new float[chunkSamples];
-        for (int i = 0; i < chunkSamples; i++)
-        {
-            tScaled1[i] = tChunk[i] * 0.005f;
-            tScaled2[i] = tChunk[i] * 0.007f;
-        }
-
-        var thetaPerturb = simplexPan.GenerateNoise(tScaled1);
-        var phiPerturb = simplexPan.GenerateNoise(tScaled2, 1.0f);
-
-        for (int i = 0; i < chunkSamples; i++)
-        {
-            float time = tChunk[i];
-
-            // Simplex perturbation
-            float tp = 0.10f * thetaPerturb[i];
-            float pp = 0.10f * phiPerturb[i];
-
-            // Rössler chaotic perturbation
-            tp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.X, rossler.T, time);
-            pp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.Y, rossler.T, time);
-
-            float theta = SacredConstants.TWO_PI * thetaFreq * time + tp;
-            float phi = SacredConstants.TWO_PI * phiFreq * time + pp;
-
-            panCurve[i] = (R + r * MathF.Cos(phi)) * MathF.Cos(theta) / (R + r);
-        }
-
-        // Smooth pan curve (0.002 Hz — ultra-slow, organic drift)
-        panSmoother.Process(panCurve);
-
-        // Tanh + drift
-        WaveShaper.PanCurveTanh(panCurve, 0.6f, -0.8f, 0.8f);
-        for (int i = 0; i < chunkSamples; i++)
-            panCurve[i] += driftAmp * MathF.Sin(SacredConstants.TWO_PI * driftFreq * tChunk[i]);
-
-        // Apply stereo panning
-        for (int i = 0; i < chunkSamples; i++)
-        {
-            float panScaled = panCurve[i] * 0.6f;
-            waveLeft[i] *= (1.0f - panScaled);
-            waveRight[i] *= (1.0f + panScaled);
-        }
-    }
-
-    public void Dispose()
-    {
-        // Clean up any resources
-    }
 }

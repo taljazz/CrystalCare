@@ -16,15 +16,12 @@ namespace CrystalCare;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private static readonly Dictionary<int, string> FrequencyModes = new()
+    private static string GetModeName(FrequencyMode mode) => mode switch
     {
-        [0] = "Standard",
-        [1] = "Solfeggio",
-        [2] = "Fibonacci",
-        [3] = "Pythagorean",
-        [4] = "Triple Helix DNA Activation",
-        [5] = "Taygetan Binaural",
-        [6] = "Dimensional Shift",
+        FrequencyMode.TripleHelixDna => "Triple Helix DNA Activation",
+        FrequencyMode.TaygetanBinaural => "Taygetan Binaural",
+        FrequencyMode.DimensionalShift => "Dimensional Shift",
+        _ => mode.ToString(),
     };
 
     /// <summary>
@@ -33,11 +30,11 @@ public partial class MainWindow : Window
     /// For modes 3-5: use 432 Hz (sacred geometry uses ratios * base).
     /// For mode 6 (dimensional): use 432 Hz.
     /// </summary>
-    private float DeriveBaseFreq(int selection)
+    private float DeriveBaseFreq(FrequencyMode mode)
     {
-        if (selection == 6) return 432f;
+        if (mode == FrequencyMode.DimensionalShift) return 432f;
 
-        var result = _frequencyManager.GetFrequencies(selection);
+        var result = _frequencyManager.GetFrequencies(mode);
         if (result.IsBinaural && result.BinauralPairs!.Length > 0)
         {
             var pair = result.BinauralPairs[Random.Shared.Next(result.BinauralPairs.Length)];
@@ -88,9 +85,8 @@ public partial class MainWindow : Window
     private async void OnPlay_Click(object sender, RoutedEventArgs e)
     {
         if (!ValidateAndParseDuration(out float duration)) return;
-        int selection = FreqChoice.SelectedIndex;
-        bool dimensionalMode = selection == 6;
-        float baseFreq = DeriveBaseFreq(selection);
+        var mode = (FrequencyMode)FreqChoice.SelectedIndex;
+        float baseFreq = DeriveBaseFreq(mode);
 
         _cts = new CancellationTokenSource();
         ToggleControls(isPlaying: true);
@@ -101,8 +97,7 @@ public partial class MainWindow : Window
             await _soundPlayer.PlayStreamAsync(
                 duration * 60f, baseFreq, 48000, _cts.Token,
                 updateStatus: UpdateStatus,
-                dimensionalMode: dimensionalMode,
-                freqSelection: selection);
+                freqMode: mode);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -114,9 +109,8 @@ public partial class MainWindow : Window
             if (!_isClosing)
             {
                 ToggleControls(isPlaying: false);
-                string modeName = FrequencyModes.GetValueOrDefault(selection, "");
-                string msg = selection is 4 or 5 or 6
-                    ? $"{modeName} completed."
+                string msg = mode is FrequencyMode.TripleHelixDna or FrequencyMode.TaygetanBinaural or FrequencyMode.DimensionalShift
+                    ? $"{GetModeName(mode)} completed."
                     : "Playback completed.";
                 UpdateStatus(msg);
             }
@@ -127,12 +121,12 @@ public partial class MainWindow : Window
     {
         if (!ValidateAndParseDuration(out float duration)) return;
 
-        int selection = FreqChoice.SelectedIndex;
+        var mode = (FrequencyMode)FreqChoice.SelectedIndex;
 
         // Check frequencies available (matching Python guard)
-        if (selection != 6)
+        if (mode != FrequencyMode.DimensionalShift)
         {
-            var freqResult = _frequencyManager.GetFrequencies(selection);
+            var freqResult = _frequencyManager.GetFrequencies(mode);
             if (freqResult.Frequencies.Length == 0 && !freqResult.IsBinaural)
             {
                 UpdateStatus("Error: No frequencies available for the selected set.");
@@ -156,8 +150,7 @@ public partial class MainWindow : Window
         }
 
         string filename = dialog.FileName;
-        bool dimensionalMode = selection == 6;
-        float baseFreq = DeriveBaseFreq(selection);
+        float baseFreq = DeriveBaseFreq(mode);
 
         _cts = new CancellationTokenSource();
         ToggleControls(isPlaying: true, showGauge: true);
@@ -169,8 +162,7 @@ public partial class MainWindow : Window
                 filename, duration * 60f, baseFreq, 48000, _cts.Token,
                 updateStatus: UpdateStatus,
                 updateProgress: p => Dispatcher.InvokeAsync(() => Gauge.Value = p * 100),
-                dimensionalMode: dimensionalMode,
-                freqSelection: selection);
+                freqMode: mode);
         }
         catch (OperationCanceledException)
         {
@@ -187,9 +179,8 @@ public partial class MainWindow : Window
                 ToggleControls(isPlaying: false, showGauge: false);
                 if (!(_cts?.IsCancellationRequested ?? true))
                 {
-                    string modeName = FrequencyModes.GetValueOrDefault(selection, "");
-                    string msg = selection is 4 or 5 or 6
-                        ? $"{modeName} saved as {filename}."
+                    string msg = mode is FrequencyMode.TripleHelixDna or FrequencyMode.TaygetanBinaural or FrequencyMode.DimensionalShift
+                        ? $"{GetModeName(mode)} saved as {filename}."
                         : $"Resonance saved as {filename}.";
                     UpdateStatus(msg);
                 }
@@ -227,12 +218,12 @@ public partial class MainWindow : Window
     {
         if (!ValidateAndParseDuration(out float duration)) return;
 
-        int selection = FreqChoice.SelectedIndex;
+        var mode = (FrequencyMode)FreqChoice.SelectedIndex;
 
         // Check frequencies available
-        if (selection != 6)
+        if (mode != FrequencyMode.DimensionalShift)
         {
-            var freqResult = _frequencyManager.GetFrequencies(selection);
+            var freqResult = _frequencyManager.GetFrequencies(mode);
             if (freqResult.Frequencies.Length == 0 && !freqResult.IsBinaural)
             {
                 UpdateStatus("Error: No frequencies available for the selected set.");
@@ -261,8 +252,6 @@ public partial class MainWindow : Window
         }
         string saveDir = folderDialog.SelectedPath;
 
-        bool dimensionalMode = selection == 6;
-
         _cts = new CancellationTokenSource();
         ToggleControls(isPlaying: true, showGauge: true);
         UpdateStatus($"Batch saving {numTones} tones to {saveDir}...");
@@ -275,7 +264,7 @@ public partial class MainWindow : Window
                 {
                     if (_cts.Token.IsCancellationRequested) break;
 
-                    float baseFreq = DeriveBaseFreq(selection);
+                    float baseFreq = DeriveBaseFreq(mode);
                     string filename = Path.Combine(saveDir, $"tone{i + 1}.wav");
 
                     await _soundPlayer.SaveToWavAsync(
@@ -286,8 +275,7 @@ public partial class MainWindow : Window
                             float overall = ((float)i + p) / numTones;
                             Dispatcher.InvokeAsync(() => Gauge.Value = overall * 100);
                         },
-                        dimensionalMode: dimensionalMode,
-                        freqSelection: selection);
+                        freqMode: mode);
 
                     await Dispatcher.InvokeAsync(() =>
                         UpdateStatus($"Saved tone {i + 1}/{numTones}: {Path.GetFileName(filename)}"));
@@ -324,7 +312,6 @@ public partial class MainWindow : Window
         _isClosing = true;
         _cts?.Cancel();
         _soundPlayer.StopPlayback();
-        _soundGenerator.Dispose();
         _soundPlayer.Dispose();
     }
 
@@ -419,67 +406,5 @@ public partial class MainWindow : Window
         }
 
         return true;
-    }
-}
-
-/// <summary>
-/// Simple dialog to get number of tones for batch save.
-/// Matches Python's wx.NumberEntryDialog.
-/// </summary>
-public class NumToneDialog : Window
-{
-    private readonly System.Windows.Controls.TextBox _input;
-    public int NumTones { get; private set; } = 1;
-
-    public NumToneDialog()
-    {
-        Title = "Batch Save";
-        Width = 300;
-        Height = 150;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
-
-        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(10) };
-
-        panel.Children.Add(new System.Windows.Controls.TextBlock
-        {
-            Text = "Enter the number of tones to save:",
-            Margin = new Thickness(0, 0, 0, 8),
-        });
-
-        _input = new System.Windows.Controls.TextBox
-        {
-            Text = "1",
-            Margin = new Thickness(0, 0, 0, 8),
-        };
-        _input.SelectAll();
-        panel.Children.Add(_input);
-
-        var btnPanel = new System.Windows.Controls.StackPanel
-        {
-            Orientation = System.Windows.Controls.Orientation.Horizontal,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-        };
-        var okBtn = new System.Windows.Controls.Button
-        {
-            Content = "OK", Width = 75, Margin = new Thickness(5, 0, 0, 0), IsDefault = true,
-        };
-        okBtn.Click += (_, _) =>
-        {
-            if (int.TryParse(_input.Text, out int n) && n >= 1 && n <= 1000)
-            {
-                NumTones = n;
-                DialogResult = true;
-            }
-        };
-        var cancelBtn = new System.Windows.Controls.Button
-        {
-            Content = "Cancel", Width = 75, Margin = new Thickness(5, 0, 0, 0), IsCancel = true,
-        };
-        btnPanel.Children.Add(okBtn);
-        btnPanel.Children.Add(cancelBtn);
-        panel.Children.Add(btnPanel);
-
-        Content = panel;
     }
 }

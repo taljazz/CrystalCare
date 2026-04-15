@@ -5,8 +5,8 @@ namespace CrystalCare.Core.Dsp;
 /// Uses Robert Bristow-Johnson's Audio EQ Cookbook formula — numerically stable
 /// at any valid cutoff frequency.
 ///
-/// Replaces ButterworthDesign + SosFilter for the main pipeline lowpass,
-/// which had bilinear transform instability at certain cutoff values.
+/// Numerically stable lowpass for the main pipeline, avoiding bilinear
+/// transform instability at extreme cutoff values.
 ///
 /// Multiple biquads can be cascaded for higher-order filtering:
 /// Order 4 = 2 cascaded biquads (each is 2nd order).

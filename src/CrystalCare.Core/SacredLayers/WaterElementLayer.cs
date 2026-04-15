@@ -1,5 +1,4 @@
 using CrystalCare.Core.Frequencies;
-using CrystalCare.Core.Noise;
 
 namespace CrystalCare.Core.SacredLayers;
 
@@ -10,29 +9,23 @@ namespace CrystalCare.Core.SacredLayers;
 /// Spatial wave interference (not sine stacking) — distance-based decay creates
 /// organic movement as the observer traces the lemniscate.
 ///
-/// Sources arranged in Seed of Life geometry (hexagonal, ice crystal pattern).
-/// Tidal simplex modulation for organic, breathing amplitude.
-/// Standing wave resonance at Schumann x PHI.
-///
-/// Fully stateless: observer position determined from absolute time.
-///
 /// Scale: 0.0012
-/// Fade: 46 seconds
+/// Fade: 55 seconds (Fibonacci)
 /// Breath: 11% at 0.007 Hz (~143 second cycle)
-///
-/// Port of AudioProcessor.water_element_layer_chunk() from SoundGenerator.py.
 /// </summary>
-public sealed class WaterElementLayer : ISacredLayer
+public sealed class WaterElementLayer : SacredLayerBase
 {
-    private readonly ThreadLocal<Simplex5D> _simplex = new(() => new Simplex5D(Random.Shared.Next(100)));
+    protected override float FadeSeconds => 55.0f;
+    protected override float BreathCenter => 0.945f;
+    protected override float BreathDepth => 0.055f;
+    protected override float BreathFreq => 0.007f;
+    protected override float OutputScale => 0.0012f;
+    protected override bool BreathBeforeFade => true;
 
-    public float[] ComputeChunk(ReadOnlySpan<float> tChunk, float totalDuration)
+    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+        float totalDuration, int n)
     {
-        if (totalDuration < 60f)
-            return new float[tChunk.Length];
-
-        var simplex = _simplex.Value!;
-        int n = tChunk.Length;
+        var simplex = Simplex.Value!;
 
         // Simplex perturbation for organic observer drift
         var tScaled = new float[n];
@@ -99,18 +92,6 @@ public sealed class WaterElementLayer : ISacredLayer
                 MathF.Cos(SacredConstants.TWO_PI * schumannPhi * tChunk[i]);
             result[i] += standing;
         }
-
-        // Breath modulation: 0.007 Hz (~143s period), 11% depth
-        for (int i = 0; i < n; i++)
-        {
-            float breath = 0.945f + 0.055f * MathF.Sin(SacredConstants.TWO_PI * 0.007f * tChunk[i]);
-            result[i] *= breath;
-        }
-
-        // Sacred fade envelope + scale
-        var fade = SacredFadeEnvelope.Compute(tChunk, totalDuration, fadeSeconds: 55.0f);
-        for (int i = 0; i < n; i++)
-            result[i] *= fade[i] * 0.0012f;
 
         return result;
     }
