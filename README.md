@@ -1,4 +1,4 @@
-# CrystalCare — v4.2.0
+# CrystalCare — v4.3.0
 
 A dynamic sound healing application that generates evolving, spiral-based tones to balance, empower, protect, and energetically heal. Inspired by Lemurian crystalline healing traditions and built with modern mathematical modeling, CrystalCare creates immersive soundscapes that go beyond static binaural beats or isochronic tones.
 
