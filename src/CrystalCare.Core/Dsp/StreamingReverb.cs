@@ -27,17 +27,20 @@ public sealed class StreamingReverb
         // IR length: 2.618 seconds (golden ratio)
         int irLength = (int)(sampleRate * 2.618f);
 
-        // Build impulse response: exponential decay + PHI sinusoidal modulation
+        // Build impulse response: exponential decay + PHI sinusoidal modulation.
+        // Decay rate 0.75 = 3/4 (Pythagorean ratio from the Merkaba 3:4:5 triangle).
+        // Decay multiplier = PHI (golden ratio shapes the reverb tail envelope).
+        // Modulation amplitude = 1/13 (Fibonacci reciprocal).
         _ir = new float[irLength];
-        float decayRate = 0.75f;
+        float decayRate = 0.75f; // 3/4 Pythagorean ratio
         for (int i = 0; i < irLength; i++)
         {
             float t = (float)i / irLength;
-            // Exponential decay: exp(-linspace(0, decay*1.8, length))
-            _ir[i] = MathF.Exp(-t * decayRate * 1.8f);
-            // Add PHI sinusoidal modulation
-            _ir[i] += 0.08f * MathF.Sin(SacredConstants.TWO_PI * SacredConstants.PHI *
-                (float)i / irLength);
+            // Exponential decay shaped by PHI — golden ratio governs the reverb tail
+            _ir[i] = MathF.Exp(-t * decayRate * SacredConstants.REVERB_DECAY_MULTIPLIER);
+            // PHI sinusoidal modulation at 1/13 Fibonacci amplitude
+            _ir[i] += SacredConstants.REVERB_MOD_AMP * MathF.Sin(SacredConstants.TWO_PI *
+                SacredConstants.PHI * (float)i / irLength);
         }
 
         // Normalize IR

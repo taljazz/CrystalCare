@@ -10,13 +10,25 @@ public static class EvolvingNoiseLayer
 {
     /// <summary>
     /// Generate an evolving noise layer with low-frequency oscillation modulation.
+    /// Noise level = BREATH_ROOT × PHI_SQ_INVERSE (sacred root derivative).
+    /// Oscillation amplitude = 1/55 (Fibonacci reciprocal).
+    /// Frequency range spans the breath ladder: BREATH_ROOT to BREATH_PHI_100.
     /// </summary>
-    public static float[] Generate(ReadOnlySpan<float> t, float noiseLevel = 0.003f, Random? rng = null)
+    public static float[] Generate(ReadOnlySpan<float> t,
+        float noiseLevel = 0f, // 0 = use sacred default
+        Random? rng = null)
     {
         rng ??= Random.Shared;
+
+        // Sacred noise level: BREATH_ROOT × PHI_SQ_INVERSE (~0.00299)
+        if (noiseLevel == 0f)
+            noiseLevel = SacredConstants.NOISE_LEVEL;
+
         var result = new float[t.Length];
 
-        float freq = (float)(rng.NextDouble() * 0.013 + 0.002); // [0.002, 0.015]
+        // Frequency range spans the breath ladder: BREATH_ROOT (~0.00783) to BREATH_PHI_100 (~0.01267)
+        float freqRange = SacredConstants.BREATH_PHI_100 - SacredConstants.BREATH_ROOT;
+        float freq = SacredConstants.BREATH_ROOT + (float)rng.NextDouble() * freqRange;
 
         for (int i = 0; i < t.Length; i++)
         {
@@ -27,7 +39,9 @@ public static class EvolvingNoiseLayer
                              MathF.Cos(SacredConstants.TWO_PI * u2);
 
             float noise = gaussian * noiseLevel;
-            float lowFreqOsc = 0.015f * MathF.Sin(SacredConstants.TWO_PI * freq * t[i]);
+            // Oscillation amplitude = 1/55 (Fibonacci reciprocal)
+            float lowFreqOsc = SacredConstants.NOISE_OSC_AMP *
+                MathF.Sin(SacredConstants.TWO_PI * freq * t[i]);
             result[i] = noise * (1.0f + lowFreqOsc);
         }
 

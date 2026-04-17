@@ -73,6 +73,32 @@ public static class SacredConstants
     // LFO inner modulation depth: 1/PHI² — golden ratio squared reciprocal
     public const float LFO_INNER_MOD_DEPTH = PHI_SQ_INVERSE;  // 0.382
 
+    // Pan smoother cutoff: same as drift center — connects pan smoothing to Earth's breath
+    public static readonly float PAN_SMOOTHER_CUTOFF = DRIFT_FREQ_CENTER;  // ~0.00185 Hz
+
+    // Noise scale bounds: Fibonacci reciprocals 1/21 to 1/13
+    public const float NOISE_SCALE_MIN = 1f / 21f;   // ~0.0476 (Fibonacci)
+    public const float NOISE_SCALE_MAX = 1f / 13f;    // ~0.0769 (Fibonacci)
+
+    // Evolving noise level: BREATH_ROOT × PHI_SQ_INVERSE — noise amplitude from sacred root
+    public static readonly float NOISE_LEVEL = SCHUMANN / 1000f * PHI_SQ_INVERSE;  // ~0.00299
+
+    // Evolving noise oscillation amplitude: 1/55 (Fibonacci reciprocal)
+    public const float NOISE_OSC_AMP = 1f / 55f;  // ~0.01818
+
+    // Reverb decay multiplier: PHI — golden ratio shapes the reverb tail
+    public const float REVERB_DECAY_MULTIPLIER = PHI;  // 1.618
+
+    // Reverb modulation amplitude: 1/13 (Fibonacci reciprocal)
+    public const float REVERB_MOD_AMP = 1f / 13f;  // ~0.0769
+
+    // PHI-fractal echo factor: 1/21 (Fibonacci reciprocal)
+    public const float FRACTAL_ECHO_FACTOR = 1f / 21f;  // ~0.0476
+
+    // Wave shaper output scale: 528/432 — the Love Frequency ratio
+    // Same ratio used in Lemurian Quartz's heart chakra bridge
+    public const float WAVE_SHAPER_SCALE = 528f / MERKABA_KEYNOTE;  // ~1.2222
+
     #endregion
 
     // Six sacred layers breathe as one organism through a PHI-ladder.

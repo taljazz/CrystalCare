@@ -1,3 +1,5 @@
+using CrystalCare.Core.Frequencies;
+
 namespace CrystalCare.Core.Dsp;
 
 /// <summary>
@@ -12,14 +14,16 @@ public static class WaveShaper
     #region Wave Shaping
 
     /// <summary>
-    /// Apply tanh wave shaping: y = 1.2 * tanh(shapeFactor * clamp(x, -1, 1))
+    /// Apply tanh wave shaping: y = (528/432) * tanh(shapeFactor * clamp(x, -1, 1))
+    /// Output scale is the Love Frequency ratio — the same 528/432 ratio used
+    /// in Lemurian Quartz's heart chakra bridge.
     /// </summary>
     public static void Process(Span<float> signal, float shapeFactor = 2.5f)
     {
         for (int i = 0; i < signal.Length; i++)
         {
             float clamped = System.Math.Clamp(signal[i], -1.0f, 1.0f);
-            signal[i] = MathF.Tanh(shapeFactor * clamped) * 1.2f;
+            signal[i] = MathF.Tanh(shapeFactor * clamped) * SacredConstants.WAVE_SHAPER_SCALE;
         }
     }
 

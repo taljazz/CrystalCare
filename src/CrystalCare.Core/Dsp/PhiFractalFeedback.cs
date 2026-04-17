@@ -25,7 +25,9 @@ public sealed class PhiFractalFeedback
     private readonly float _factor;
     private float[] _tail; // Carried between chunks
 
-    public PhiFractalFeedback(int sampleRate = 48000, int depth = 3, float factor = 0.05f)
+    // Default echo factor = 1/21 (Fibonacci reciprocal, ≈0.0476)
+    public PhiFractalFeedback(int sampleRate = 48000, int depth = 3,
+        float factor = SacredConstants.FRACTAL_ECHO_FACTOR)
     {
         _baseDelay = (int)(sampleRate / SacredConstants.PHI); // ~29,708 samples
         _depth = depth;
@@ -100,8 +102,9 @@ public sealed class PhiFractalFeedback
     // No tail carry needed since there are no chunk boundaries.
     #region Batch Processing (Stateless)
 
+    // Default echo factor = 1/21 (Fibonacci reciprocal)
     public static float[] Process(ReadOnlySpan<float> signal, int sampleRate = 48000,
-        int depth = 3, float factor = 0.05f)
+        int depth = 3, float factor = SacredConstants.FRACTAL_ECHO_FACTOR)
     {
         var result = new float[signal.Length];
         signal.CopyTo(result);

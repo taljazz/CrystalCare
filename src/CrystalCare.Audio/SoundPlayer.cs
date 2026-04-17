@@ -43,7 +43,8 @@ public sealed class SoundPlayer : IDisposable
         int sampleRate, CancellationToken ct,
         Action<string>? updateStatus = null,
         Action<float>? updateProgress = null,
-        FrequencyMode freqMode = FrequencyMode.Standard)
+        FrequencyMode freqMode = FrequencyMode.Standard,
+        int deviceNumber = -1)
     {
         var chunkQueue = new BlockingCollection<float[,]>(boundedCapacity: 4);
 
@@ -79,6 +80,7 @@ public sealed class SoundPlayer : IDisposable
         {
             _waveOut = new WaveOutEvent
             {
+                DeviceNumber = deviceNumber,
                 DesiredLatency = 200,
                 NumberOfBuffers = 3,
             };

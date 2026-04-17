@@ -89,6 +89,7 @@ For sessions longer than 60 seconds (or any length in Dimensional Journey mode),
 ## Features
 
 - Real-time streaming playback with instant audio start
+- Output device selection — choose which audio device CrystalCare resonates through
 - WAV export with peak normalization
 - Batch save for generating multiple sessions
 - Accessible interface with screen reader support (WPF + NVDA compatible)

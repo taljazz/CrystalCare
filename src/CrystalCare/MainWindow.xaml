@@ -31,12 +31,21 @@
                 </ComboBox>
             </GroupBox>
 
-            <!-- Duration Input (matches Python: wx.StaticBox + wx.TextCtrl, HORIZONTAL) -->
+            <!-- Duration Input -->
             <GroupBox Header="Session Duration (Minutes)" Margin="0,0,0,5"
                       AutomationProperties.Name="Session Duration">
                 <TextBox x:Name="DurationText" Margin="10"
                          AutomationProperties.Name="Duration in minutes"
                          ToolTip="Enter the duration of the session in minutes (max 60)." />
+            </GroupBox>
+
+            <!-- Output Device Selection -->
+            <GroupBox Header="Output Device" Margin="0,0,0,5"
+                      AutomationProperties.Name="Output Device">
+                <ComboBox x:Name="DeviceChoice" Margin="10"
+                          AutomationProperties.Name="Output sound device"
+                          ToolTip="Select which audio device CrystalCare will resonate through."
+                          SelectedIndex="0" />
             </GroupBox>
 
             <!-- Buttons (matches Python: wx.BoxSizer HORIZONTAL, centered) -->

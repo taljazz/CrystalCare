@@ -110,19 +110,23 @@ public sealed partial class SoundGenerator
         const float torusR = 0.618f;      // 1/PHI — golden ratio reciprocal (major radius)
         const float torusRSmall = 0.382f;  // 1/PHI² — golden ratio squared reciprocal (minor radius)
 
-        // Dedicated Simplex noise instances for different pipeline stages (independent seeds)
-        var simplexEnvelope = new Simplex5D(42);   // ADSR envelope organic variation
-        var simplexFractal = new Simplex5D(7);     // Fractal frequency variation
-        var simplexPan = new Simplex5D(13);        // Toroidal panning perturbation
+        // Dedicated Simplex noise instances for different pipeline stages.
+        // Seeds are Fibonacci numbers for sacred consistency (21, 7, 13).
+        var simplexEnvelope = new Simplex5D(21);   // ADSR envelope organic variation (Fibonacci)
+        var simplexFractal = new Simplex5D(7);     // Fractal frequency variation (Fibonacci)
+        var simplexPan = new Simplex5D(13);        // Toroidal panning perturbation (Fibonacci)
 
         // Check if Taygetan binaural mode is active — requires stereo frequency pairs
         bool hasTaygetan = freqMode == FrequencyMode.TaygetanBinaural;
         var tayFreqResult = hasTaygetan ? _frequencyManager.GetFrequencies(FrequencyMode.TaygetanBinaural) : null;
         var tayPairs = tayFreqResult?.BinauralPairs;
 
-        // Randomized noise and fade parameters for organic uniqueness each session
-        float noiseScaleLeft = (float)(_rng.NextDouble() * 0.02 + 0.04);   // Left channel noise amplitude
-        float noiseScaleRight = (float)(_rng.NextDouble() * 0.02 + 0.04);  // Right channel noise amplitude
+        // Randomized noise and fade parameters for organic uniqueness each session.
+        // Noise scale bounded by Fibonacci reciprocals: 1/21 to 1/13.
+        float noiseScaleLeft = SacredConstants.NOISE_SCALE_MIN +
+            (float)_rng.NextDouble() * (SacredConstants.NOISE_SCALE_MAX - SacredConstants.NOISE_SCALE_MIN);
+        float noiseScaleRight = SacredConstants.NOISE_SCALE_MIN +
+            (float)_rng.NextDouble() * (SacredConstants.NOISE_SCALE_MAX - SacredConstants.NOISE_SCALE_MIN);
         float noiseOffsetRight = (float)(_rng.NextDouble() * 0.014 + 0.001); // Time offset for right noise
         int fadeDuration = _rng.Next(2) == 0 ? 21 : 34; // Fibonacci pair for master fade
         int fadeSamples = fadeDuration * sampleRate;
@@ -151,9 +155,10 @@ public sealed partial class SoundGenerator
         var filterLeft = BiquadFilter.CreateLowpass(2, lpCutoff, sampleRate);
         var filterRight = BiquadFilter.CreateLowpass(2, lpCutoff, sampleRate);
 
-        // 0.002 Hz exponential smoother — makes toroidal panning extremely slow and organic.
-        // Only the slowest drift survives this filter.
-        var panSmoother = new ExponentialSmoother(0.002f, sampleRate);
+        // Pan smoother cutoff = BREATH_ROOT / PHI^3 — same as drift center.
+        // Connects pan smoothing to Earth's Schumann breath through PHI.
+        // Extremely slow — only the slowest organic drift survives.
+        var panSmoother = new ExponentialSmoother(SacredConstants.PAN_SMOOTHER_CUTOFF, sampleRate);
 
         // PHI-fractal feedback — golden-ratio-delayed micro-echoes for harmonic richness.
         // Stateful: carries echo tail between chunks for seamless continuity.

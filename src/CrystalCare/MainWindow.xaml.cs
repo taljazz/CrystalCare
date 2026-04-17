@@ -7,6 +7,7 @@ using CrystalCare.Audio;
 using CrystalCare.Core.Frequencies;
 using CrystalCare.Core.Generation;
 using Microsoft.Win32;
+using NAudio.Wave;
 
 namespace CrystalCare;
 
@@ -71,6 +72,9 @@ public partial class MainWindow : Window
         // Create the sound player that wraps NAudio for playback and saving
         _soundPlayer = new SoundPlayer(_soundGenerator);
 
+        // Populate the output device dropdown with all available audio devices
+        PopulateDeviceList();
+
         UpdateStatus("CrystalCare ready. Select a frequency set and duration, then press Play.");
     }
 
@@ -99,11 +103,13 @@ public partial class MainWindow : Window
 
         try
         {
-            // Stream audio in real-time — constant memory regardless of duration
+            // Stream audio in real-time — constant memory regardless of duration.
+            // Pass the selected output device number for playback.
             await _soundPlayer.PlayStreamAsync(
                 duration * 60f, baseFreq, 48000, _cts.Token,
                 updateStatus: UpdateStatus,
-                freqMode: mode);
+                freqMode: mode,
+                deviceNumber: GetSelectedDeviceNumber());
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -347,9 +353,43 @@ public partial class MainWindow : Window
 
     #endregion
 
-    // Helper methods for mode name display, base frequency derivation,
-    // UI control state toggling, status message output, and duration validation.
+    // Helper methods for device enumeration, mode name display, base frequency
+    // derivation, UI control state toggling, status message output, and duration validation.
     #region UI Helpers
+
+    /// <summary>
+    /// Populate the output device dropdown with all available audio output devices.
+    /// Uses NAudio's WaveOut.GetCapabilities to enumerate devices.
+    /// Device -1 is the system default (Windows Sound Mapper).
+    /// </summary>
+    private void PopulateDeviceList()
+    {
+        DeviceChoice.Items.Clear();
+
+        // Add the default device first (Windows Sound Mapper, device -1)
+        DeviceChoice.Items.Add("Default Output Device");
+
+        // Enumerate all available output devices
+        for (int i = 0; i < WaveOut.DeviceCount; i++)
+        {
+            var caps = WaveOut.GetCapabilities(i);
+            DeviceChoice.Items.Add(caps.ProductName);
+        }
+
+        DeviceChoice.SelectedIndex = 0;
+    }
+
+    /// <summary>
+    /// Get the NAudio device number for the selected output device.
+    /// Returns -1 for the default device, or 0-based index for specific devices.
+    /// </summary>
+    private int GetSelectedDeviceNumber()
+    {
+        // Index 0 = "Default Output Device" = NAudio device -1
+        // Index 1+ = specific devices = NAudio device 0+
+        int selected = DeviceChoice.SelectedIndex;
+        return selected <= 0 ? -1 : selected - 1;
+    }
 
     /// <summary>
     /// Convert a FrequencyMode enum to a human-readable display name.
@@ -401,6 +441,7 @@ public partial class MainWindow : Window
 
         // Enable/disable all input controls
         FreqChoice.IsEnabled = isIdle;
+        DeviceChoice.IsEnabled = isIdle;
         DurationText.IsEnabled = isIdle;
         PlayBtn.IsEnabled = isIdle;
         SaveBtn.IsEnabled = isIdle;
