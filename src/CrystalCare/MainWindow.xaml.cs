@@ -361,22 +361,52 @@ public partial class MainWindow : Window
     /// Populate the output device dropdown with all available audio output devices.
     /// Uses NAudio's WaveOut.GetCapabilities to enumerate devices.
     /// Device -1 is the system default (Windows Sound Mapper).
+    /// Preserves the currently selected device by name if it still exists.
     /// </summary>
     private void PopulateDeviceList()
     {
+        // Remember the previously selected device name to restore after refresh
+        string? previousSelection = DeviceChoice.SelectedItem as string;
+
         DeviceChoice.Items.Clear();
 
         // Add the default device first (Windows Sound Mapper, device -1)
         DeviceChoice.Items.Add("Default Output Device");
 
-        // Enumerate all available output devices
+        // Enumerate all currently available output devices
         for (int i = 0; i < WaveOut.DeviceCount; i++)
         {
             var caps = WaveOut.GetCapabilities(i);
             DeviceChoice.Items.Add(caps.ProductName);
         }
 
-        DeviceChoice.SelectedIndex = 0;
+        // Try to restore the previous selection by name; fall back to default
+        if (previousSelection != null)
+        {
+            int matchIdx = -1;
+            for (int i = 0; i < DeviceChoice.Items.Count; i++)
+            {
+                if ((string)DeviceChoice.Items[i] == previousSelection)
+                {
+                    matchIdx = i;
+                    break;
+                }
+            }
+            DeviceChoice.SelectedIndex = matchIdx >= 0 ? matchIdx : 0;
+        }
+        else
+        {
+            DeviceChoice.SelectedIndex = 0;
+        }
+    }
+
+    /// <summary>
+    /// Refresh the device list every time the user opens the dropdown.
+    /// This reflects devices plugged in or removed after application start.
+    /// </summary>
+    private void DeviceChoice_DropDownOpened(object sender, EventArgs e)
+    {
+        PopulateDeviceList();
     }
 
     /// <summary>

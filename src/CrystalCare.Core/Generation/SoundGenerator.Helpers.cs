@@ -180,8 +180,10 @@ public sealed partial class SoundGenerator
         for (int i = 0; i < estSamples; i++)
             peak = MathF.Max(peak, MathF.Abs(estWave[i]));
 
-        // Return gain with 1.3x headroom (conservative, aims for ~0.77 peak)
-        return 1.0f / (peak * 1.3f);
+        // Return gain with PHI headroom (golden ratio, aims for ~0.618 peak).
+        // Sacred 1.618x margin accommodates reverb tail energy, deep LFO modulation,
+        // and the Love Frequency wave shaper scale without clipping on attacks.
+        return 1.0f / (peak * SacredConstants.PHI);
     }
 
     #endregion

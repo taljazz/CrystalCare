@@ -45,7 +45,8 @@
                 <ComboBox x:Name="DeviceChoice" Margin="10"
                           AutomationProperties.Name="Output sound device"
                           ToolTip="Select which audio device CrystalCare will resonate through."
-                          SelectedIndex="0" />
+                          SelectedIndex="0"
+                          DropDownOpened="DeviceChoice_DropDownOpened" />
             </GroupBox>
 
             <!-- Buttons (matches Python: wx.BoxSizer HORIZONTAL, centered) -->
