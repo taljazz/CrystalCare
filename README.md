@@ -21,7 +21,7 @@ CrystalCare fuses ancient sound healing principles with advanced mathematical an
 - **Six Sacred Healing Layers** - Sub-perceptual layers activate in longer sessions: Pleroma Mercy, Silent Solfeggio Grid, Archon Dissolution, Crystalline Resonance, Lemurian Merkaba, and Water Element
 - **Nine Crystal Profiles** - Harmonic ratios derived from real Raman spectroscopy data for nine minerals, each with unique acoustic signatures
 - **3D Spatial Audio** - Toroidal panning on a PHI-derived torus (radii 0.618 + 0.382 = 1.0, two halves summing to unity) with Rössler chaotic perturbation creates immersive, never-repeating soundscapes
-- **Sacred Numerical Architecture** - Every constant carries intention: master volume 0.52 (digits sum to 7), Fibonacci modulation intervals [34, 55, 89, 144], Fibonacci fade durations, PHI-derived torus geometry
+- **Sacred Numerical Architecture** - Every constant carries intention: master volume 0.43 (digits sum to 7), Fibonacci modulation intervals [34, 55, 89, 144], Fibonacci fade durations, PHI-derived torus geometry, unified Schumann-rooted breath ladder, golden angle spatial arrangement, PHI-connected LFO and drift
 - **Streaming Audio Engine** - Real-time chunk-by-chunk generation allows sessions of unlimited length with constant memory usage
 - **Lemurian Heart-Based Philosophy** - Heart coherence, divine feminine warmth, 432 Hz keynote, and water-element consciousness
 
@@ -45,13 +45,21 @@ Every numerical constant in CrystalCare carries sacred intention:
 
 | Parameter | Value | Sacred Basis |
 |-----------|-------|-------------|
-| Master Volume | 0.52 | Digits sum to 7 (sacred number) |
+| Master Volume | 0.43 | Digits sum to 7 (sacred number) |
 | Modulation Intervals | [34, 55, 89, 144] | True Fibonacci sequence |
 | Torus Major Radius | 0.618 | 1/PHI (golden ratio reciprocal) |
 | Torus Minor Radius | 0.382 | 1/PHI² (together they sum to 1.0 — two halves reconciling) |
 | Master Fade | 21 or 34 seconds | Fibonacci pair |
 | Lighter Layer Fades | 34 seconds | Fibonacci (Solfeggio, Crystalline) |
 | Deeper Layer Fades | 55 seconds | Fibonacci (Pleroma, Archon, Merkaba, Water) |
+| Breath Root | Schumann / 1000 | Earth's heartbeat scaled to breath (~128s cycle) |
+| Breath Ladder | PHI^(n/4) × root | 5 layers breathe in golden ratio relationship |
+| Heart Coherence | 0.1 Hz | HeartMath heart coherence (Merkaba, 10s cycle) |
+| Golden Angle | 137.5° | Nature's optimal packing — sacred layer spatial arrangement |
+| LFO Base Frequency | Breath root × PHI⁴ | Amplitude modulation connected to Schumann through PHI |
+| Drift Frequency | Breath root / PHI³ | Spatial drift as PHI sub-harmonic of Earth's breath |
+| Drift Amplitude | 1/89 to 1/55 | Fibonacci reciprocal bounds |
+| LFO Inner Modulation | 1/PHI² | Golden ratio squared reciprocal (0.382) |
 
 ## Sacred Healing Layers
 
