@@ -15,9 +15,10 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public static class ToroidalPanner
 {
-    /// <summary>
-    /// Pre-computed toroidal panning parameters.
-    /// </summary>
+    // Pre-computed panning parameters — theta/phi frequencies and drift settings.
+    // Drawn once at pipeline start for session-wide consistency.
+    #region Parameters
+
     public sealed class PanParams
     {
         public float ThetaFreq { get; init; }
@@ -40,6 +41,13 @@ public static class ToroidalPanner
             PanDriftAmp = (float)(rng.NextDouble() * 0.1 + 0.05),
         };
     }
+
+    #endregion
+
+    // Computes stereo gain arrays from toroidal panning + optional Rössler chaos.
+    // Maps torus surface point to horizontal pan and depth for stereo placement.
+    // PHI-derived minor radius (0.382) creates golden-ratio torus geometry.
+    #region Chunk Computation
 
     /// <summary>
     /// Compute stereo gains for a chunk using toroidal panning + Rössler chaos.
@@ -81,4 +89,6 @@ public static class ToroidalPanner
             gainRight[i] = rightGain;
         }
     }
+
+    #endregion
 }

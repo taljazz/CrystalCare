@@ -18,12 +18,24 @@ namespace CrystalCare.Core.SacredLayers;
 /// </summary>
 public sealed class LemurianMerkabaLayer : SacredLayerBase
 {
+    // Configuration: 55s Fibonacci fade, 5% breath depth at 0.1 Hz (HeartMath
+    // heart coherence), 0.0006 output scale. BreathBeforeFade = true (Group B).
+    #region Layer Configuration
+
     protected override float FadeSeconds => 55.0f;
     protected override float BreathCenter => 0.975f;
     protected override float BreathDepth => 0.025f;
-    protected override float BreathFreq => 0.1f;
+    protected override float BreathFreq => SacredConstants.BREATH_HEART_COHERENCE; // 0.1 Hz HeartMath
     protected override float OutputScale => 0.0006f;
     protected override bool BreathBeforeFade => true;
+
+    #endregion
+
+    // Generates the Sonic Merkaba: 4 frequencies (324/432/540/698.4 Hz) from the
+    // Pythagorean 3:4:5 triangle + PHI, with PHI-weighted amplitudes and organic
+    // phase wobble from simplex noise. Flower of Life geometric modulation enriches
+    // the Merkaba structure at 0.0006 sub-perceptual scale.
+    #region Signal Generation
 
     protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
         float totalDuration, int n)
@@ -59,4 +71,6 @@ public sealed class LemurianMerkabaLayer : SacredLayerBase
 
         return merkaba;
     }
+
+    #endregion
 }

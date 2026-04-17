@@ -10,6 +10,10 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public static class FractalVariation
 {
+    // Full-signal fractal variation using simplex noise with LFO modulation.
+    // Creates organic, ever-changing pitch micro-variations.
+    #region Batch Computation
+
     /// <summary>
     /// Compute fractal frequency variation for a time array.
     /// Uses simplex noise with octave-like layering for rich variation.
@@ -49,9 +53,13 @@ public static class FractalVariation
         return variation;
     }
 
-    /// <summary>
-    /// Compute fractal variation for a streaming chunk (stateless).
-    /// </summary>
+    #endregion
+
+    // Per-chunk fractal variation using shifted index trick on single noise array.
+    // Simpler than dual-simplex but still produces rich organic variation.
+    // Used by CrystallineResonanceLayer for crystal micro-variation.
+    #region Streaming Chunk Computation
+
     public static float[] ComputeChunk(ReadOnlySpan<float> tChunk, float baseFreq,
         Simplex5D simplex)
     {
@@ -76,6 +84,13 @@ public static class FractalVariation
         return variation;
     }
 
+    #endregion
+
+    // Dual-simplex fractal variation — the version used by the main pipeline.
+    // Two independent simplex noise calls provide richer variation than single-noise.
+    // Matches the original inline pipeline logic exactly (single source of truth).
+    #region Dual Simplex Computation (Pipeline)
+
     /// <summary>
     /// Compute fractal variation using dual simplex noise layers.
     /// Matches the inline pipeline logic exactly — two independent noise calls
@@ -97,4 +112,6 @@ public static class FractalVariation
                          baseNoise[i] * baseNoise[i] * 0.2f) * 12.0f;
         return result;
     }
+
+    #endregion
 }

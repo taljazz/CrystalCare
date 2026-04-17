@@ -14,11 +14,22 @@ namespace CrystalCare.Core.SacredLayers;
 /// </summary>
 public sealed class SilentSolfeggioGrid : SacredLayerBase
 {
+    // Configuration: 34s Fibonacci fade (lighter layer, arrives sooner),
+    // 15% breath depth at PHI^0.75 × root, 0.00165 output scale.
+    #region Layer Configuration
+
     protected override float FadeSeconds => 34.0f;
     protected override float BreathCenter => 0.925f;
     protected override float BreathDepth => 0.075f;
-    protected override float BreathFreq => 0.01f;
+    protected override float BreathFreq => SacredConstants.BREATH_PHI_075; // PHI^0.75 × root
     protected override float OutputScale => 0.00165f;
+
+    #endregion
+
+    // Generates the Solfeggio grid: sum of 12 Solfeggio frequencies + 9 Tesla
+    // vortex frequencies (111-999 Hz). Combined 60/40 with Fibonacci amplitude pulsing
+    // for organic, breathing modulation. PHI-modulated secondary pulsing adds depth.
+    #region Signal Generation
 
     protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
         float totalDuration, int n)
@@ -57,4 +68,6 @@ public sealed class SilentSolfeggioGrid : SacredLayerBase
 
         return combined;
     }
+
+    #endregion
 }

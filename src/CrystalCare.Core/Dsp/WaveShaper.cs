@@ -7,6 +7,10 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public static class WaveShaper
 {
+    // Tanh soft saturation — clamp to [-1, 1], apply tanh(factor * x) * 1.2.
+    // Produces gentle harmonic distortion without hard clipping.
+    #region Wave Shaping
+
     /// <summary>
     /// Apply tanh wave shaping: y = 1.2 * tanh(shapeFactor * clamp(x, -1, 1))
     /// </summary>
@@ -18,6 +22,11 @@ public static class WaveShaper
             signal[i] = MathF.Tanh(shapeFactor * clamped) * 1.2f;
         }
     }
+
+    #endregion
+
+    // Peak normalization with headroom factor — scales signal so peak * factor = 1.0.
+    #region Normalization
 
     /// <summary>
     /// Normalize signal by peak amplitude with a scale factor for headroom.
@@ -37,6 +46,12 @@ public static class WaveShaper
         }
     }
 
+    #endregion
+
+    // Tanh-based pan curve processing — soft-clips the pan value to [-0.8, 0.8]
+    // for gentle stereo bounds that never hit hard left/right.
+    #region Pan Curve
+
     /// <summary>
     /// Pan curve processing: clamp(tanh(x * scale), clipMin, clipMax).
     /// Port of jit_pan_curve_tanh().
@@ -47,4 +62,6 @@ public static class WaveShaper
         for (int i = 0; i < panCurve.Length; i++)
             panCurve[i] = System.Math.Clamp(MathF.Tanh(panCurve[i] * scale), clipMin, clipMax);
     }
+
+    #endregion
 }

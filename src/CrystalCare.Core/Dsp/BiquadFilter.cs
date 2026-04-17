@@ -13,6 +13,10 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public sealed class BiquadFilter
 {
+    // Factory method and internal state. Creates cascaded biquad sections
+    // for Butterworth-characteristic lowpass filtering at any cutoff frequency.
+    #region Factory and Fields
+
     private readonly BiquadSection[] _sections;
 
     /// <summary>
@@ -46,9 +50,12 @@ public sealed class BiquadFilter
         _sections = sections;
     }
 
-    /// <summary>
-    /// Filter data in-place, carrying state between calls (streaming safe).
-    /// </summary>
+    #endregion
+
+    // In-place filtering with state carry between calls — essential for seamless
+    // streaming across chunk boundaries (no clicks or discontinuities).
+    #region Processing
+
     public void Process(Span<float> data)
     {
         foreach (var section in _sections)
@@ -60,6 +67,13 @@ public sealed class BiquadFilter
         foreach (var section in _sections)
             section.Reset();
     }
+
+    #endregion
+
+    // Single biquad section using Direct Form II Transposed implementation.
+    // Audio EQ Cookbook formula — numerically stable at any valid cutoff.
+    // State variables use double precision for accumulated filter accuracy.
+    #region Biquad Section (Inner Class)
 
     /// <summary>
     /// Single biquad section (Direct Form II Transposed).
@@ -120,4 +134,6 @@ public sealed class BiquadFilter
             _z2 = 0;
         }
     }
+
+    #endregion
 }

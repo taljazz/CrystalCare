@@ -21,11 +21,23 @@ namespace CrystalCare.Core.SacredLayers;
 /// </summary>
 public sealed class PleromaMercyLayer : SacredLayerBase
 {
+    // Configuration for the Pleroma layer: 55s Fibonacci fade, 10% breath depth
+    // at PHI × root frequency, 0.0003 sub-perceptual output scale.
+    #region Layer Configuration
+
     protected override float FadeSeconds => 55.0f;
     protected override float BreathCenter => 0.95f;
     protected override float BreathDepth => 0.05f;
-    protected override float BreathFreq => 0.012f;
+    protected override float BreathFreq => SacredConstants.BREATH_PHI_100; // PHI × root
     protected override float OutputScale => 0.0003f;
+
+    #endregion
+
+    // Generates the Pleroma signal: 13-step Aeonic ladder (Schumann × PHI^n),
+    // Ogdoad gateway (62.64 Hz threshold), and 7 Archon mercy harmonics.
+    // Sacred geometry modulation via Metatron/Vesica Piscis/Flower of Life ratios.
+    // Combined: 50% aeonic + 30% ogdoad + 20% archon mercy.
+    #region Signal Generation
 
     protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
         float totalDuration, int n)
@@ -98,6 +110,12 @@ public sealed class PleromaMercyLayer : SacredLayerBase
         return mercy;
     }
 
+    #endregion
+
+    // Cosine nulling — multiplies by cos(2π × Schumann/1000 × t) to imprint
+    // Earth's heartbeat as a scalar modulation on the Pleroma signal.
+    #region Post-Processing (Cosine Nulling)
+
     protected override void PostProcess(float[] signal, ReadOnlySpan<float> tChunk, int n)
     {
         // Cosine nulling (scalar imprint)
@@ -105,4 +123,6 @@ public sealed class PleromaMercyLayer : SacredLayerBase
             signal[i] *= MathF.Cos(SacredConstants.TWO_PI *
                 (SacredConstants.SCHUMANN / 1000f) * tChunk[i]);
     }
+
+    #endregion
 }

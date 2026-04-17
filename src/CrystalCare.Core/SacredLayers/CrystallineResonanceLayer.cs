@@ -16,6 +16,11 @@ namespace CrystalCare.Core.SacredLayers;
 /// </summary>
 public sealed class CrystallineResonanceLayer : SacredLayerBase
 {
+    // Crystal library reference, session crystal sequence (Lemurian first),
+    // base frequency, and configuration: 34s Fibonacci fade, 13% breath depth
+    // at √PHI × root, 0.0009 output scale.
+    #region Fields and Configuration
+
     private readonly CrystalProfileLibrary _crystalLib;
     private readonly int[] _crystalSequence;
     private readonly float _baseFreq;
@@ -23,7 +28,7 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
     protected override float FadeSeconds => 34.0f;
     protected override float BreathCenter => 0.935f;
     protected override float BreathDepth => 0.065f;
-    protected override float BreathFreq => 0.009f;
+    protected override float BreathFreq => SacredConstants.BREATH_PHI_050; // √PHI × root
     protected override float OutputScale => 0.0009f;
 
     public CrystallineResonanceLayer(CrystalProfileLibrary crystalLib,
@@ -33,6 +38,15 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
         _crystalSequence = crystalSequence;
         _baseFreq = baseFreq;
     }
+
+    #endregion
+
+    // Generates crystal harmonic profiles from Raman spectroscopy data.
+    // Adaptive crystal count based on duration (2 for short, up to 9 for long sessions).
+    // Golden angle modulates segment boundaries for organic transition timing.
+    // PHI-timed crossfade (Perlin smoother step) between crystal personalities.
+    // 0.1% fractal micro-variation adds organic aliveness to each crystal.
+    #region Signal Generation
 
     protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
         float totalDuration, int n)
@@ -49,9 +63,20 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
         else if (totalDuration < 1800) numCrystals = 7;
         else numCrystals = numProfiles;
 
-        float segmentDuration = totalDuration / numCrystals;
-        float crossfadeDur = segmentDuration / SacredConstants.PHI;
-        float halfXfade = crossfadeDur / 2.0f;
+        // Golden angle crystal timing — each crystal's segment boundary is placed
+        // at golden-angle fractions of the total duration, like seeds on a sunflower.
+        // This prevents the mind from predicting transitions.
+        float avgSegment = totalDuration / numCrystals;
+        var segBoundaries = new float[numCrystals + 1];
+        segBoundaries[0] = 0;
+        for (int ci = 1; ci < numCrystals; ci++)
+        {
+            // Golden angle fraction modulates the midpoint of each boundary
+            float goldenOffset = 0.15f * avgSegment *
+                MathF.Sin(ci * SacredConstants.GOLDEN_ANGLE_RAD);
+            segBoundaries[ci] = ci * avgSegment + goldenOffset;
+        }
+        segBoundaries[numCrystals] = totalDuration;
 
         var result = new float[n];
 
@@ -60,8 +85,11 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
             int crystalIdx = _crystalSequence[ci % numProfiles];
             var profile = profiles[crystalIdx];
 
-            float segStart = ci * segmentDuration;
-            float segEnd = (ci + 1) * segmentDuration;
+            float segStart = segBoundaries[ci];
+            float segEnd = segBoundaries[ci + 1];
+            float segmentDuration = segEnd - segStart;
+            float crossfadeDur = segmentDuration / SacredConstants.PHI;
+            float halfXfade = crossfadeDur / 2.0f;
 
             float extStart = ci > 0 ? MathF.Max(0, segStart - halfXfade) : 0;
             float extEnd = ci < numCrystals - 1 ? MathF.Min(totalDuration, segEnd + halfXfade) : totalDuration;
@@ -116,4 +144,6 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
 
         return result;
     }
+
+    #endregion
 }

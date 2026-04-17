@@ -8,10 +8,11 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public static class HarmonicGenerator
 {
-    /// <summary>
-    /// Generate harmonics for all frequencies with envelope, LFO, and modulation depth.
-    /// Port of jit_generate_harmonics_vectorized — the hot inner loop of sound generation.
-    /// </summary>
+    // The hot inner loop — generates harmonics for all 13 frequencies with
+    // envelope, LFO, cross-modulation, and per-harmonic amplitude scaling.
+    // Cross-modulation at freq × PHI_INVERSE creates golden-ratio harmonic relationships.
+    #region Harmonic Generation
+
     public static float[] GenerateHarmonics(ReadOnlySpan<float> t, float[] frequencies,
         ReadOnlySpan<float> envelope, ReadOnlySpan<float> lfo, float[] modDepths)
     {
@@ -22,7 +23,7 @@ public static class HarmonicGenerator
         for (int f = 0; f < nFreqs; f++)
         {
             float freq = frequencies[f];
-            float modFreq = freq * 0.5f;
+            float modFreq = freq * SacredConstants.PHI_INVERSE; // 1/φ cross-modulation — golden ratio harmonic relationship
             float modDepth = modDepths[f];
             float scale = 0.015f / (f + 1);
 
@@ -37,10 +38,12 @@ public static class HarmonicGenerator
         return result;
     }
 
-    /// <summary>
-    /// Cross-modulation wave generation.
-    /// Port of jit_cross_modulate_wave().
-    /// </summary>
+    #endregion
+
+    // FM synthesis cross-modulation — one frequency modulates another's phase.
+    // Creates complex harmonic sidebands for richer tonal character.
+    #region Cross-Modulation
+
     public static float[] CrossModulate(float baseFreq, float modFreq,
         ReadOnlySpan<float> t, float modDepth)
     {
@@ -53,10 +56,13 @@ public static class HarmonicGenerator
         return result;
     }
 
-    /// <summary>
-    /// Quantum harmonic interference with Simplex-driven gamma.
-    /// Port of jit_quantum_harmonic().
-    /// </summary>
+    #endregion
+
+    // Quantum harmonic interference — 4 waves at irrational frequency ratios
+    // (√2, e, π) with simplex-driven phase modulation. Creates non-repeating
+    // interference patterns. Includes Schumann resonance undertone.
+    #region Quantum Harmonic
+
     public static float[] QuantumHarmonic(ReadOnlySpan<float> t, float baseFreq,
         ReadOnlySpan<float> gamma)
     {
@@ -82,4 +88,6 @@ public static class HarmonicGenerator
         }
         return result;
     }
+
+    #endregion
 }

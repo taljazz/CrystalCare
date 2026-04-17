@@ -15,12 +15,26 @@ namespace CrystalCare.Core.SacredLayers;
 /// </summary>
 public sealed class WaterElementLayer : SacredLayerBase
 {
+    // Configuration: 55s Fibonacci fade, 11% breath depth at Schumann/1000 root
+    // (Earth's deepest breath), 0.0012 output scale. BreathBeforeFade = true (Group B).
+    #region Layer Configuration
+
     protected override float FadeSeconds => 55.0f;
     protected override float BreathCenter => 0.945f;
     protected override float BreathDepth => 0.055f;
-    protected override float BreathFreq => 0.007f;
+    protected override float BreathFreq => SacredConstants.BREATH_ROOT; // Schumann/1000 — Earth's breath
     protected override float OutputScale => 0.0012f;
     protected override bool BreathBeforeFade => true;
+
+    #endregion
+
+    // Generates a 7-source hexagonal ripple field with a lemniscate (figure-8)
+    // observer path. Uses spatial wave interference (not sine stacking) —
+    // distance-based exponential decay creates organic movement as the observer
+    // traces the lemniscate. Fibonacci-derived decay rates per source.
+    // Tidal simplex modulation adds slow breathing amplitude.
+    // Standing wave resonance at Schumann × Schumann*PHI adds harmonic depth.
+    #region Signal Generation
 
     protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
         float totalDuration, int n)
@@ -95,4 +109,6 @@ public sealed class WaterElementLayer : SacredLayerBase
 
         return result;
     }
+
+    #endregion
 }

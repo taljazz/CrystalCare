@@ -12,55 +12,46 @@ namespace CrystalCare;
 
 /// <summary>
 /// Main application window — WPF GUI with full screen reader accessibility.
-/// Port of CrystalCareFrame from main.py.
+/// Handles all user interaction: Play, Save, Batch Save, Stop, and Guide.
+/// Uses WindowsFormsHost for a native Win32 TextBox that NVDA can navigate reliably.
 /// </summary>
 public partial class MainWindow : Window
 {
-    private static string GetModeName(FrequencyMode mode) => mode switch
-    {
-        FrequencyMode.TripleHelixDna => "Triple Helix DNA Activation",
-        FrequencyMode.TaygetanBinaural => "Taygetan Binaural",
-        FrequencyMode.DimensionalShift => "Dimensional Shift",
-        _ => mode.ToString(),
-    };
+    // Core services and state for the application's audio pipeline and UI lifecycle.
+    #region Fields
 
-    /// <summary>
-    /// Derive base frequency from the frequency manager, matching Python logic.
-    /// For modes 0-2: randomly pick from the returned frequency list.
-    /// For modes 3-5: use 432 Hz (sacred geometry uses ratios * base).
-    /// For mode 6 (dimensional): use 432 Hz.
-    /// </summary>
-    private float DeriveBaseFreq(FrequencyMode mode)
-    {
-        if (mode == FrequencyMode.DimensionalShift) return 432f;
-
-        var result = _frequencyManager.GetFrequencies(mode);
-        if (result.IsBinaural && result.BinauralPairs!.Length > 0)
-        {
-            var pair = result.BinauralPairs[Random.Shared.Next(result.BinauralPairs.Length)];
-            return pair.Left;
-        }
-
-        if (result.Frequencies.Length > 0)
-            return result.Frequencies[Random.Shared.Next(result.Frequencies.Length)];
-
-        return 432f;
-    }
-
+    // Manages all sacred geometry ratio sets and frequency mode lookups
     private readonly FrequencyManager _frequencyManager = new();
+
+    // Orchestrates the 16-stage audio pipeline (streaming and batch generation)
     private readonly SoundGenerator _soundGenerator;
+
+    // Handles NAudio playback (streaming) and WAV file writing (saves)
     private readonly SoundPlayer _soundPlayer;
+
+    // Cancellation source for stopping playback/save operations mid-stream
     private CancellationTokenSource? _cts;
+
+    // Guards against UI updates after the window has begun closing
     private bool _isClosing;
 
-    // Native Win32 TextBox for reliable screen reader navigation
+    // Native Win32 multiline TextBox hosted via WindowsFormsHost — screen readers
+    // (NVDA, JAWS) can navigate this with arrow keys, unlike WPF's LiveRegion
     private readonly System.Windows.Forms.TextBox _statusTextBox;
+
+    #endregion
+
+    // Initializes the WPF window, creates the accessible status TextBox,
+    // wires up the sound generator and player, and posts the ready message.
+    #region Constructor
 
     public MainWindow()
     {
         InitializeComponent();
 
-        // Create a native Win32 multiline read-only TextBox — same as wx.TextCtrl
+        // Create a native Win32 multiline read-only TextBox for screen reader access.
+        // WPF's AutomationPeer LiveRegionChanged is broken in NVDA, so we use
+        // WindowsFormsHost with a standard WinForms TextBox instead.
         _statusTextBox = new System.Windows.Forms.TextBox
         {
             Multiline = true,
@@ -74,17 +65,31 @@ public partial class MainWindow : Window
         };
         StatusHost.Child = _statusTextBox;
 
+        // Create the sound generator with the frequency manager for ratio lookups
         _soundGenerator = new SoundGenerator(_frequencyManager);
+
+        // Create the sound player that wraps NAudio for playback and saving
         _soundPlayer = new SoundPlayer(_soundGenerator);
 
         UpdateStatus("CrystalCare ready. Select a frequency set and duration, then press Play.");
     }
 
-    // ========== EVENT HANDLERS ==========
+    #endregion
 
+    // Button click handlers for Play, Save, Guide, Batch Save, Stop, and window close.
+    // Each handler validates input, derives the base frequency for the selected mode,
+    // and delegates to the SoundPlayer for streaming playback or WAV file generation.
+    #region Event Handlers
+
+    /// <summary>
+    /// Play button — starts real-time streaming playback through speakers.
+    /// Audio begins within ~0.2 seconds via the producer-consumer pattern.
+    /// </summary>
     private async void OnPlay_Click(object sender, RoutedEventArgs e)
     {
         if (!ValidateAndParseDuration(out float duration)) return;
+
+        // Cast the ComboBox index directly to FrequencyMode enum (values match 0-6)
         var mode = (FrequencyMode)FreqChoice.SelectedIndex;
         float baseFreq = DeriveBaseFreq(mode);
 
@@ -94,6 +99,7 @@ public partial class MainWindow : Window
 
         try
         {
+            // Stream audio in real-time — constant memory regardless of duration
             await _soundPlayer.PlayStreamAsync(
                 duration * 60f, baseFreq, 48000, _cts.Token,
                 updateStatus: UpdateStatus,
@@ -109,6 +115,8 @@ public partial class MainWindow : Window
             if (!_isClosing)
             {
                 ToggleControls(isPlaying: false);
+
+                // Named modes get personalized completion messages
                 string msg = mode is FrequencyMode.TripleHelixDna or FrequencyMode.TaygetanBinaural or FrequencyMode.DimensionalShift
                     ? $"{GetModeName(mode)} completed."
                     : "Playback completed.";
@@ -117,13 +125,17 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Save button — generates the full session in memory and writes a WAV file.
+    /// Two-pass: generate audio, find peak, write normalized 16-bit PCM.
+    /// </summary>
     private async void OnSave_Click(object sender, RoutedEventArgs e)
     {
         if (!ValidateAndParseDuration(out float duration)) return;
 
         var mode = (FrequencyMode)FreqChoice.SelectedIndex;
 
-        // Check frequencies available (matching Python guard)
+        // Guard: ensure frequencies exist for the selected mode (Dimensional uses all)
         if (mode != FrequencyMode.DimensionalShift)
         {
             var freqResult = _frequencyManager.GetFrequencies(mode);
@@ -134,6 +146,7 @@ public partial class MainWindow : Window
             }
         }
 
+        // Show save dialog for WAV file location
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Save Resonance as WAV",
@@ -158,6 +171,7 @@ public partial class MainWindow : Window
 
         try
         {
+            // Generate full session in memory and write to WAV
             await _soundPlayer.SaveToWavAsync(
                 filename, duration * 60f, baseFreq, 48000, _cts.Token,
                 updateStatus: UpdateStatus,
@@ -188,10 +202,14 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Guide button — opens the user guide HTML file in the default browser.
+    /// </summary>
     private void OnGuide_Click(object sender, RoutedEventArgs e)
     {
         try
         {
+            // Try app base directory first (published exe), then current directory (debug)
             string guidePath = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "guide.html");
 
@@ -214,13 +232,17 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Batch Save button — generates multiple WAV files with unique random seeds.
+    /// Each tone gets a fresh random base frequency for variety.
+    /// </summary>
     private async void OnBatchSave_Click(object sender, RoutedEventArgs e)
     {
         if (!ValidateAndParseDuration(out float duration)) return;
 
         var mode = (FrequencyMode)FreqChoice.SelectedIndex;
 
-        // Check frequencies available
+        // Guard: ensure frequencies exist for the selected mode
         if (mode != FrequencyMode.DimensionalShift)
         {
             var freqResult = _frequencyManager.GetFrequencies(mode);
@@ -231,7 +253,7 @@ public partial class MainWindow : Window
             }
         }
 
-        // Number of tones dialog
+        // Ask user how many tones to generate (1-1000)
         var numDialog = new NumToneDialog();
         if (numDialog.ShowDialog() != true)
         {
@@ -240,7 +262,7 @@ public partial class MainWindow : Window
         }
         int numTones = numDialog.NumTones;
 
-        // Directory selection
+        // Ask user where to save the files
         var folderDialog = new System.Windows.Forms.FolderBrowserDialog
         {
             Description = "Choose a directory to save the tones:",
@@ -264,6 +286,7 @@ public partial class MainWindow : Window
                 {
                     if (_cts.Token.IsCancellationRequested) break;
 
+                    // Each tone gets a fresh random base frequency
                     float baseFreq = DeriveBaseFreq(mode);
                     string filename = Path.Combine(saveDir, $"tone{i + 1}.wav");
 
@@ -272,6 +295,7 @@ public partial class MainWindow : Window
                         updateStatus: UpdateStatus,
                         updateProgress: p =>
                         {
+                            // Overall progress = (completed tones + current progress) / total
                             float overall = ((float)i + p) / numTones;
                             Dispatcher.InvokeAsync(() => Gauge.Value = overall * 100);
                         },
@@ -300,6 +324,9 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Stop button — cancels the current operation and stops audio playback.
+    /// </summary>
     private void OnStop_Click(object sender, RoutedEventArgs e)
     {
         _cts?.Cancel();
@@ -307,6 +334,9 @@ public partial class MainWindow : Window
         UpdateStatus("Stopping operation...");
     }
 
+    /// <summary>
+    /// Window closing — cancels any running operation and disposes audio resources.
+    /// </summary>
     private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         _isClosing = true;
@@ -315,12 +345,61 @@ public partial class MainWindow : Window
         _soundPlayer.Dispose();
     }
 
-    // ========== UI HELPERS ==========
+    #endregion
 
+    // Helper methods for mode name display, base frequency derivation,
+    // UI control state toggling, status message output, and duration validation.
+    #region UI Helpers
+
+    /// <summary>
+    /// Convert a FrequencyMode enum to a human-readable display name.
+    /// Most modes use the enum name directly; special modes get custom labels.
+    /// </summary>
+    private static string GetModeName(FrequencyMode mode) => mode switch
+    {
+        FrequencyMode.TripleHelixDna => "Triple Helix DNA Activation",
+        FrequencyMode.TaygetanBinaural => "Taygetan Binaural",
+        FrequencyMode.DimensionalShift => "Dimensional Shift",
+        _ => mode.ToString(),
+    };
+
+    /// <summary>
+    /// Derive the base frequency for a given mode.
+    /// Modes 0-2: randomly pick from the mode's frequency list.
+    /// Modes 3-5: use 432 Hz (sacred geometry ratios multiply the base).
+    /// Mode 6 (Dimensional): always 432 Hz.
+    /// </summary>
+    private float DeriveBaseFreq(FrequencyMode mode)
+    {
+        if (mode == FrequencyMode.DimensionalShift) return 432f;
+
+        var result = _frequencyManager.GetFrequencies(mode);
+
+        // Binaural modes return frequency pairs — use the left ear frequency
+        if (result.IsBinaural && result.BinauralPairs!.Length > 0)
+        {
+            var pair = result.BinauralPairs[Random.Shared.Next(result.BinauralPairs.Length)];
+            return pair.Left;
+        }
+
+        // Standard modes — pick a random frequency from the set
+        if (result.Frequencies.Length > 0)
+            return result.Frequencies[Random.Shared.Next(result.Frequencies.Length)];
+
+        // Fallback to 432 Hz (Lemurian keynote)
+        return 432f;
+    }
+
+    /// <summary>
+    /// Enable/disable UI controls based on whether an operation is running.
+    /// Uses Enable/Disable pattern (not Show/Hide) for screen reader accessibility.
+    /// Focus moves to Stop when playing, back to Play when idle.
+    /// </summary>
     private void ToggleControls(bool isPlaying, bool showGauge = false)
     {
         bool isIdle = !isPlaying;
 
+        // Enable/disable all input controls
         FreqChoice.IsEnabled = isIdle;
         DurationText.IsEnabled = isIdle;
         PlayBtn.IsEnabled = isIdle;
@@ -329,11 +408,13 @@ public partial class MainWindow : Window
         BatchSaveBtn.IsEnabled = isIdle;
         StopBtn.IsEnabled = isPlaying;
 
+        // Show/collapse stop button
         if (isPlaying)
             StopBtn.Visibility = Visibility.Visible;
         else
             StopBtn.Visibility = Visibility.Collapsed;
 
+        // Show/collapse progress gauge
         if (showGauge)
         {
             Gauge.Value = 0;
@@ -345,13 +426,17 @@ public partial class MainWindow : Window
             Gauge.Value = 0;
         }
 
-        // Focus management for screen reader
+        // Focus management for screen reader — always move focus to the active button
         if (isPlaying)
             StopBtn.Focus();
         else
             PlayBtn.Focus();
     }
 
+    /// <summary>
+    /// Thread-safe status message output. Can be called from any thread.
+    /// Dispatches to the UI thread if called from a background thread.
+    /// </summary>
     private void UpdateStatus(string message)
     {
         if (_isClosing) return;
@@ -371,7 +456,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Append text to the native Win32 TextBox.
+    /// Append a message to the native Win32 TextBox.
     /// Screen readers navigate this with arrow keys just like wx.TextCtrl in Python.
     /// </summary>
     private void AppendAndAnnounce(string message)
@@ -379,6 +464,11 @@ public partial class MainWindow : Window
         _statusTextBox.AppendText(message + Environment.NewLine);
     }
 
+    /// <summary>
+    /// Validate and parse the duration text field.
+    /// Must be a positive number no greater than 60 minutes.
+    /// Returns false and shows an error if invalid.
+    /// </summary>
     private bool ValidateAndParseDuration(out float duration)
     {
         duration = 0;
@@ -407,4 +497,6 @@ public partial class MainWindow : Window
 
         return true;
     }
+
+    #endregion
 }

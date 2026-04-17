@@ -9,9 +9,10 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public static class MicrotonalLfo
 {
-    /// <summary>
-    /// Pre-computed LFO parameters (drawn once at pipeline start).
-    /// </summary>
+    // LFO parameter container — drawn once at pipeline start for session consistency.
+    // Two frequencies (lfo1 and lfo2) with PHI-modulated relationship.
+    #region Parameters
+
     public sealed class LfoParams
     {
         public float Lfo1Freq { get; init; }
@@ -19,9 +20,13 @@ public static class MicrotonalLfo
         public float Depth { get; init; }
     }
 
-    /// <summary>
-    /// Draw random LFO parameters for a given base frequency.
-    /// </summary>
+    #endregion
+
+    // DrawParams: randomizes LFO frequencies and depth with PHI-power modulation.
+    // Compute: generates LFO values for a time array using the pre-drawn params.
+    // Generate: convenience one-shot method combining DrawParams + Compute.
+    #region Parameter Drawing and Computation
+
     public static LfoParams DrawParams(float baseFrequency, Random? rng = null)
     {
         rng ??= Random.Shared;
@@ -40,8 +45,15 @@ public static class MicrotonalLfo
         var result = new float[t.Length];
         for (int i = 0; i < t.Length; i++)
         {
-            float drift = 0.01f * MathF.Sin(0.1f * MathF.PI * t[i]);
-            float innerMod = 0.3f * MathF.Sin(SacredConstants.TWO_PI * p.Lfo2Freq * t[i]);
+            // Drift: 1/89 (Fibonacci) amplitude at 0.1 Hz (HeartMath heart coherence)
+            float drift = SacredConstants.LFO_DRIFT_AMP *
+                MathF.Sin(SacredConstants.BREATH_HEART_COHERENCE * MathF.PI * t[i]);
+
+            // Inner modulation: 1/PHI² depth — golden ratio squared reciprocal
+            float innerMod = SacredConstants.LFO_INNER_MOD_DEPTH *
+                MathF.Sin(SacredConstants.TWO_PI * p.Lfo2Freq * t[i]);
+
+            // Combined LFO: depth + drift, modulated by lfo1 with inner phase modulation
             result[i] = (p.Depth + drift) *
                 (1.0f + MathF.Sin(SacredConstants.TWO_PI * p.Lfo1Freq * t[i] + innerMod));
         }
@@ -55,4 +67,6 @@ public static class MicrotonalLfo
     {
         return Compute(t, DrawParams(baseFrequency, rng));
     }
+
+    #endregion
 }

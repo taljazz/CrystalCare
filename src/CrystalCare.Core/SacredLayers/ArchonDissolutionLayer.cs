@@ -14,12 +14,24 @@ namespace CrystalCare.Core.SacredLayers;
 /// </summary>
 public sealed class ArchonDissolutionLayer : SacredLayerBase
 {
+    // Configuration: MinDuration 30s (internal guard), 55s Fibonacci fade,
+    // 12% breath depth at PHI^0.25 × root, 0.000225 output scale.
+    #region Layer Configuration
+
     protected override float MinDuration => 30f;
     protected override float FadeSeconds => 55.0f;
     protected override float BreathCenter => 0.94f;
     protected override float BreathDepth => 0.06f;
-    protected override float BreathFreq => 0.008f;
+    protected override float BreathFreq => SacredConstants.BREATH_PHI_025; // PHI^0.25 × root
     protected override float OutputScale => 0.000225f;
+
+    #endregion
+
+    // Generates targeted mercy frequencies for each of the 7 planetary Archons.
+    // Each Archon gets three waves: Acknowledge (planetary freq), Elevate (PHI harmonic
+    // above, directing toward Pleroma), Ground (nearest Schumann harmonic, Earth's truth).
+    // PHI-scaled amplitude ensures the chief Archon (Sun) is strongest.
+    #region Signal Generation
 
     protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
         float totalDuration, int n)
@@ -74,4 +86,6 @@ public sealed class ArchonDissolutionLayer : SacredLayerBase
 
         return dissolution;
     }
+
+    #endregion
 }

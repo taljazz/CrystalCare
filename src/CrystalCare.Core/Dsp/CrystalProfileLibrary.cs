@@ -12,6 +12,10 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public sealed class CrystalProfileLibrary
 {
+    // Data model for a single crystal profile — harmonic ratios from Raman spectroscopy,
+    // symmetry order, optional shimmer/beating/piezo/detune effects.
+    #region Crystal Profile Data Model
+
     public sealed class CrystalProfile
     {
         public required CrystalType Type { get; init; }
@@ -27,6 +31,12 @@ public sealed class CrystalProfileLibrary
         public float BowlBeat { get; init; }
     }
 
+    #endregion
+
+    // Public access to the profile array and the Lemurian Quartz index.
+    // Lemurian Quartz is always first in every session — divine feminine heart energy.
+    #region Properties and Constructor
+
     public CrystalProfile[] Profiles { get; }
     public int LemurianIndex { get; }
 
@@ -35,6 +45,14 @@ public sealed class CrystalProfileLibrary
         Profiles = BuildProfiles();
         LemurianIndex = Array.FindIndex(Profiles, p => p.Type == CrystalType.LemurianQuartz);
     }
+
+    #endregion
+
+    // Generates the harmonic signal for a single crystal profile at given time values.
+    // Sums weighted sine waves at harmonic ratio frequencies, then applies optional
+    // piezo phase wobble, organic detune drift, shimmer modulation, beating pairs,
+    // and bowl beat modulation depending on the crystal's properties.
+    #region Harmonic Generation
 
     /// <summary>
     /// Generate harmonics for a single crystal profile at given time values.
@@ -133,6 +151,14 @@ public sealed class CrystalProfileLibrary
         return result;
     }
 
+    #endregion
+
+    // Defines all 9 crystal profiles with harmonic ratios from Raman spectroscopy.
+    // Lemurian Quartz: 12 harmonics with heart chakra bridges and divine feminine warmth.
+    // Clear Quartz: 9 harmonics, master healer. Amethyst: meditative drift.
+    // Also computes PHI-weighted amplitude weights and mineral-specific warmth weights.
+    #region Profile Definitions
+
     private static CrystalProfile[] BuildProfiles()
     {
         float[] quartzRatios = [0.276f, 0.444f, 0.571f, 0.765f, 1.0f, 1.500f, 1.741f, 2.339f, 2.504f];
@@ -147,8 +173,8 @@ public sealed class CrystalProfileLibrary
         [
             0.276f, 0.444f, 0.571f, 0.765f,    // Sub-fundamental quartz
             1.0f,                                 // Fundamental
-            1.222f,                               // 528/432 Love Frequency ratio
-            1.375f,                               // Heart resonance
+            528f / SacredConstants.MERKABA_KEYNOTE, // 528/432 Love Frequency ratio (exact)
+            1.375f,                               // Heart resonance (594/432 exact)
             1.500f,                               // Quartz harmonic
             SacredConstants.PHI,                  // Golden heart
             1.741f,                               // Quartz harmonic
@@ -229,4 +255,6 @@ public sealed class CrystalProfileLibrary
 
         return profiles;
     }
+
+    #endregion
 }

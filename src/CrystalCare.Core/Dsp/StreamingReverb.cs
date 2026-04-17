@@ -14,6 +14,11 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public sealed class StreamingReverb
 {
+    // Impulse response (IR) and overlap tail buffer.
+    // IR: 2.618 seconds (PHI² duration) with exponential decay + PHI sinusoidal modulation.
+    // Tail buffer carries reverb spillover between chunks for seamless continuity.
+    #region Fields and Constructor
+
     private readonly float[] _ir;        // Pre-computed impulse response
     private float[] _tail;               // Overlap tail carried between chunks
 
@@ -46,6 +51,13 @@ public sealed class StreamingReverb
         // Initialize tail buffer
         _tail = new float[irLength - 1];
     }
+
+    #endregion
+
+    // FFT-based overlap-add convolution — convolves each chunk with the IR,
+    // adds the previous tail to the output, and saves the new tail for the next chunk.
+    // Returns only the first sigLen samples (same length as input).
+    #region Overlap-Add Convolution
 
     /// <summary>
     /// Process a chunk with overlap-add convolution.
@@ -84,4 +96,6 @@ public sealed class StreamingReverb
     {
         Array.Clear(_tail);
     }
+
+    #endregion
 }

@@ -11,10 +11,10 @@ namespace CrystalCare.Core.Math;
 /// </summary>
 public static class RosslerAttractor
 {
-    /// <summary>
-    /// Result of a Rössler trajectory computation.
-    /// X and Y are used for stereo pan perturbation (±0.08 radians).
-    /// </summary>
+    // Result container for the Rössler trajectory. X and Y components drive
+    // spatial panning perturbation (±0.08 radians). Z is computed but unused.
+    #region Trajectory Data
+
     public sealed class Trajectory
     {
         public required float[] X { get; init; }
@@ -23,10 +23,14 @@ public static class RosslerAttractor
         public required float[] T { get; init; }
     }
 
-    /// <summary>
-    /// Compute a low-rate Rössler trajectory for chaotic panning.
-    /// Parameters match Python: a=0.2, b=0.2, c=5.7, time scaled by 0.1.
-    /// </summary>
+    #endregion
+
+    // 4th-order Runge-Kutta integration of the Rössler ODE system.
+    // Classic parameters: a=0.2, b=0.2, c=5.7. PHI-derived initial conditions.
+    // Time scaled by 0.1 for slow, organic chaos trajectories.
+    // Output normalized to [-1, 1] range for direct use as panning perturbation.
+    #region RK4 Integration
+
     public static Trajectory Compute(float duration, float rate = 10f)
     {
         int nSamples = (int)(duration * rate);
@@ -45,10 +49,10 @@ public static class RosslerAttractor
         var zArr = new double[nSamples];
         var tArr = new float[nSamples];
 
-        // Initial conditions
-        xArr[0] = 1.0;
-        yArr[0] = 1.0;
-        zArr[0] = 1.0;
+        // Initial conditions — PHI-derived sacred genesis
+        xArr[0] = Frequencies.SacredConstants.PHI;               // φ
+        yArr[0] = 1.0;                                           // Unity
+        zArr[0] = Frequencies.SacredConstants.PHI_INVERSE;       // 1/φ
         tArr[0] = 0f;
 
         for (int i = 1; i < nSamples; i++)
@@ -100,9 +104,12 @@ public static class RosslerAttractor
         };
     }
 
-    /// <summary>
-    /// Interpolate trajectory value at an arbitrary time point.
-    /// </summary>
+    #endregion
+
+    // Binary search + linear interpolation to look up trajectory values at
+    // arbitrary time points. Used by the pipeline to get chaos values at each sample.
+    #region Interpolation
+
     public static float Interpolate(float[] trajValues, float[] trajTimes, float time)
     {
         if (trajTimes.Length == 0) return 0f;
@@ -123,6 +130,12 @@ public static class RosslerAttractor
         return trajValues[lo] + frac * (trajValues[hi] - trajValues[lo]);
     }
 
+    #endregion
+
+    // Normalizes double[] trajectory to float[] in [-1, 1] range.
+    // Divides by peak absolute value for uniform amplitude.
+    #region Normalization
+
     private static float[] NormalizeToFloat32(double[] arr)
     {
         double maxAbs = 0;
@@ -135,4 +148,6 @@ public static class RosslerAttractor
             result[i] = (float)(arr[i] / maxAbs);
         return result;
     }
+
+    #endregion
 }

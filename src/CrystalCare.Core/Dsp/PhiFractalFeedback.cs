@@ -15,6 +15,11 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public sealed class PhiFractalFeedback
 {
+    // Base delay = sampleRate / PHI (~29,708 samples at 48kHz).
+    // 3 echo depths at PHI-spaced intervals with exponentially decreasing amplitude.
+    // Tail buffer carries echo spillover between chunks for seamless continuity.
+    #region Fields and Constructor
+
     private readonly int _baseDelay;
     private readonly int _depth;
     private readonly float _factor;
@@ -30,6 +35,12 @@ public sealed class PhiFractalFeedback
         int maxDelay = _baseDelay * _depth;
         _tail = new float[maxDelay];
     }
+
+    #endregion
+
+    // Streaming mode — processes one chunk with echo tail carry between calls.
+    // Adds previous tail to start of output, generates new echoes, saves new tail.
+    #region Streaming Chunk Processing
 
     /// <summary>
     /// Process a chunk with PHI-fractal feedback, carrying echo tail between chunks.
@@ -83,9 +94,12 @@ public sealed class PhiFractalFeedback
         return result;
     }
 
-    /// <summary>
-    /// Stateless version for batch mode (no tail carry needed).
-    /// </summary>
+    #endregion
+
+    // Batch mode (stateless) — processes the full signal in one pass.
+    // No tail carry needed since there are no chunk boundaries.
+    #region Batch Processing (Stateless)
+
     public static float[] Process(ReadOnlySpan<float> signal, int sampleRate = 48000,
         int depth = 3, float factor = 0.05f)
     {
@@ -107,4 +121,6 @@ public sealed class PhiFractalFeedback
 
         return result;
     }
+
+    #endregion
 }

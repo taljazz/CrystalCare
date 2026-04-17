@@ -8,13 +8,17 @@ public sealed class FrequencyManager
 {
     private readonly Random _rng = new();
 
-    // === Base Ratio Sets ===
+    // All 9 sacred geometry ratio sets used for geometric modulation.
+    // Sacred geometry, Flower of Life, Triple Helix, Taygetan, and derived combinations.
+    // Each ratio set defines frequency relationships rooted in sacred mathematics.
+    #region Ratio Sets
+
     public static readonly Dictionary<string, float> SacredGeometryRatios = new()
     {
-        ["metatron_ratio"] = 1.414f,
-        ["vesica_piscis_ratio"] = 1.732f,
+        ["metatron_ratio"] = SacredConstants.SQRT_2,            // √2 — Metatron's Cube diagonal
+        ["vesica_piscis_ratio"] = SacredConstants.SQRT_3,       // √3 — Vesica Piscis height
         ["hexagon_ratio"] = 2.0f,
-        ["flower_of_life_ratio"] = 1.618f,
+        ["flower_of_life_ratio"] = SacredConstants.PHI,         // φ — Golden ratio
         ["circle_ratio"] = 3.0f,
     };
 
@@ -39,21 +43,33 @@ public sealed class FrequencyManager
         ["flower_of_life"] = FlowerOfLifeRatios,
         ["triple_helix"] = TripleHelixRatios,
         ["combined"] = Merge(SacredGeometryRatios, FlowerOfLifeRatios),
-        ["minimal"] = new() { ["metatron_ratio"] = 1.414f },
-        ["enhanced_geometry"] = new() { ["octagon_ratio"] = 2.828f, ["spiral_ratio"] = 2.236f },
-        ["fibonacci_set"] = new() { ["fibonacci_ratio_1"] = 1.618f, ["fibonacci_ratio_2"] = 2.618f, ["fibonacci_ratio_3"] = 4.236f },
-        ["fractal_set"] = new() { ["mandelbrot_ratio"] = 3.1415f, ["julia_ratio"] = 2.718f },
+        ["minimal"] = new() { ["metatron_ratio"] = SacredConstants.SQRT_2 },
+        ["enhanced_geometry"] = new() { ["octagon_ratio"] = 2.0f * SacredConstants.SQRT_2, ["spiral_ratio"] = SacredConstants.SQRT_5 },
+        ["fibonacci_set"] = new()
+        {
+            ["fibonacci_ratio_1"] = SacredConstants.PHI,
+            ["fibonacci_ratio_2"] = SacredConstants.PHI * SacredConstants.PHI,
+            ["fibonacci_ratio_3"] = SacredConstants.PHI * SacredConstants.PHI * SacredConstants.PHI,
+        },
+        ["fractal_set"] = new() { ["mandelbrot_ratio"] = SacredConstants.PI, ["julia_ratio"] = SacredConstants.EULER_E },
         ["taygetan"] = new()
         {
             ["root"] = 1.0f,
-            ["etheric_body"] = 1.41421356237f,     // exact sqrt(2)
-            ["astral_bridge"] = 1.73205080757f,    // exact sqrt(3)
-            ["natural_log"] = 2.71828182846f,      // exact e
-            ["crown_portal"] = 3.14159265359f,     // exact pi
-            ["zero_point"] = 4.2360679775f,        // phi^3
-            ["remembrance"] = 1.61803398875f,      // exact golden ratio
+            ["etheric_body"] = SacredConstants.SQRT_2,                                    // √2
+            ["astral_bridge"] = SacredConstants.SQRT_3,                                   // √3
+            ["natural_log"] = SacredConstants.EULER_E,                                    // e
+            ["crown_portal"] = SacredConstants.PI,                                        // π
+            ["zero_point"] = SacredConstants.PHI * SacredConstants.PHI * SacredConstants.PHI, // φ³
+            ["remembrance"] = SacredConstants.PHI,                                        // φ — one golden ratio, one truth
         },
     };
+
+    #endregion
+
+    // Selects a random ratio set using weighted probability distribution.
+    // Sacred geometry has the highest weight (0.25), with decreasing weights
+    // for less common sets. Ensures variety with controlled distribution.
+    #region Weighted Random Selection
 
     // Weighted probability distribution for random selection
     private static readonly string[] RatioSetNames = RatioSets.Keys.ToArray();
@@ -87,6 +103,13 @@ public sealed class FrequencyManager
         return RatioSets[RatioSetNames[^1]];
     }
 
+    #endregion
+
+    // Returns the frequency array (or binaural pairs) for a given FrequencyMode.
+    // Modes 0-4 return mono frequency arrays; mode 5 returns stereo binaural pairs;
+    // mode 6 (Dimensional) is handled by the pipeline itself.
+    #region Frequency Mode Selection
+
     /// <summary>
     /// Get frequencies for a given mode selection.
     /// Returns float[] for most modes, or (float, float)[] encoded as flat array for binaural (mode 5).
@@ -108,6 +131,12 @@ public sealed class FrequencyManager
             _ => new FrequencyResult(Array.Empty<float>()),
         };
     }
+
+    #endregion
+
+    // Internal helpers: Taygetan binaural pair creation, weight normalization,
+    // and dictionary merging for combined ratio sets.
+    #region Helper Methods
 
     private static FrequencyResult CreateTaygetanBinaural(float baseFreq)
     {
@@ -132,6 +161,8 @@ public sealed class FrequencyManager
             result[kvp.Key] = kvp.Value;
         return result;
     }
+
+    #endregion
 }
 
 /// <summary>

@@ -5,12 +5,25 @@ using Math = CrystalCare.Core.Math;
 
 namespace CrystalCare.Core.Generation;
 
+/// <summary>
+/// SoundGenerator effects — master fade in/out and toroidal panning.
+/// Split from the main file for readability.
+/// </summary>
 public sealed partial class SoundGenerator
 {
+    // Applies a t^1.5 power curve fade at the start and end of the session.
+    // Fade duration is a Fibonacci pair (21 or 34 seconds, chosen randomly).
+    // Works across chunk boundaries using global sample offset.
+    #region Fade In/Out
+
+    /// <summary>
+    /// Apply master fade in/out across chunk boundaries.
+    /// Uses t^1.5 power curve for smooth, organic transitions.
+    /// </summary>
     private static void ApplyFade(float[] waveLeft, float[] waveRight,
         int chunkOffset, int chunkSamples, int fadeSamples, int totalSamples)
     {
-        // Fade in
+        // Fade in: apply t^1.5 curve to samples within the fade-in region
         if (chunkOffset < fadeSamples)
         {
             int fadeEnd = global::System.Math.Min(chunkSamples, fadeSamples - chunkOffset);
@@ -23,7 +36,7 @@ public sealed partial class SoundGenerator
             }
         }
 
-        // Fade out
+        // Fade out: apply inverted t^1.5 curve to samples within the fade-out region
         int fadeOutStart = totalSamples - fadeSamples;
         if (chunkOffset + chunkSamples > fadeOutStart)
         {
@@ -38,6 +51,20 @@ public sealed partial class SoundGenerator
         }
     }
 
+    #endregion
+
+    // Applies toroidal (donut-shaped) panning to create 3D-like spatial movement.
+    // The pan path traces a torus with PHI-derived radii (0.618 + 0.382 = 1.0).
+    // Simplex noise adds organic perturbation to the torus angles.
+    // Rössler attractor adds genuine mathematical chaos (bounded, non-repeating).
+    // The result is smoothed through a 0.002 Hz exponential filter for ultra-slow drift,
+    // shaped with tanh for gentle bounds, and mixed with a slow sine drift.
+    #region Toroidal Panning
+
+    /// <summary>
+    /// Apply toroidal panning with Rössler chaos and simplex perturbation.
+    /// Uses pooled buffers for panCurve, tScaled1, and tScaled2 to avoid allocation.
+    /// </summary>
     private static void ApplyToroidalPanning(float[] waveLeft, float[] waveRight,
         ReadOnlySpan<float> tChunk, int chunkSamples,
         float thetaFreq, float phiFreq, float R, float r,
@@ -45,51 +72,61 @@ public sealed partial class SoundGenerator
         ExponentialSmoother panSmoother, float driftFreq, float driftAmp,
         ChunkBufferPool pool)
     {
+        // Use pooled buffers instead of allocating new arrays each chunk
         var panCurve = pool.PanCurve;
-
         var tScaled1 = pool.PanTScaled1;
         var tScaled2 = pool.PanTScaled2;
+
+        // Scale time arrays for simplex noise at two different rates
         for (int i = 0; i < chunkSamples; i++)
         {
-            tScaled1[i] = tChunk[i] * 0.005f;
-            tScaled2[i] = tChunk[i] * 0.007f;
+            tScaled1[i] = tChunk[i] * 0.005f;  // Slower simplex variation
+            tScaled2[i] = tChunk[i] * 0.007f;  // Slightly faster, orthogonal variation
         }
 
+        // Generate simplex noise for organic angular perturbation
         var thetaPerturb = simplexPan.GenerateNoise(tScaled1);
         var phiPerturb = simplexPan.GenerateNoise(tScaled2, 1.0f);
 
+        // Compute the raw toroidal pan curve with chaos and simplex perturbation
         for (int i = 0; i < chunkSamples; i++)
         {
             float time = tChunk[i];
 
-            // Simplex perturbation
+            // Simplex perturbation: ±0.10 radians of organic angular drift
             float tp = 0.10f * thetaPerturb[i];
             float pp = 0.10f * phiPerturb[i];
 
-            // Rössler chaotic perturbation
+            // Rössler chaotic perturbation: ±0.08 radians of bounded chaos
             tp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.X, rossler.T, time);
             pp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.Y, rossler.T, time);
 
+            // Compute torus position: theta (horizontal) and phi (depth)
             float theta = SacredConstants.TWO_PI * thetaFreq * time + tp;
             float phi = SacredConstants.TWO_PI * phiFreq * time + pp;
 
+            // Map torus position to mono pan value: x-projection of torus surface point
             panCurve[i] = (R + r * MathF.Cos(phi)) * MathF.Cos(theta) / (R + r);
         }
 
-        // Smooth pan curve (0.002 Hz — ultra-slow, organic drift)
+        // Ultra-slow smoothing (0.002 Hz) — only the slowest drift survives
         panSmoother.Process(panCurve);
 
-        // Tanh + drift
+        // Tanh soft-clipping to keep pan within [-0.8, 0.8] with gentle saturation
         WaveShaper.PanCurveTanh(panCurve, 0.6f, -0.8f, 0.8f);
+
+        // Add slow sine drift for additional gentle stereo movement
         for (int i = 0; i < chunkSamples; i++)
             panCurve[i] += driftAmp * MathF.Sin(SacredConstants.TWO_PI * driftFreq * tChunk[i]);
 
-        // Apply stereo panning
+        // Apply the computed pan curve to the stereo signal
         for (int i = 0; i < chunkSamples; i++)
         {
             float panScaled = panCurve[i] * 0.6f;
-            waveLeft[i] *= (1.0f - panScaled);
-            waveRight[i] *= (1.0f + panScaled);
+            waveLeft[i] *= (1.0f - panScaled);   // Left gets louder as pan goes left
+            waveRight[i] *= (1.0f + panScaled);  // Right gets louder as pan goes right
         }
     }
+
+    #endregion
 }

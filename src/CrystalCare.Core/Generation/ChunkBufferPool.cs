@@ -11,6 +11,10 @@ namespace CrystalCare.Core.Generation;
 /// </summary>
 internal sealed class ChunkBufferPool
 {
+    // 7 pre-allocated float[] buffers reused each chunk iteration.
+    // Allocated once at chunkSize; zeroed to activeLength each iteration via Clear().
+    #region Pooled Buffers
+
     /// <summary>Time values for the current chunk.</summary>
     public float[] TChunk { get; }
 
@@ -31,6 +35,12 @@ internal sealed class ChunkBufferPool
 
     /// <summary>Scaled time array 2 for panning simplex noise.</summary>
     public float[] PanTScaled2 { get; }
+
+    #endregion
+
+    // Allocates all 7 buffers at chunkSize. Clear() zeros each buffer up to
+    // activeLength at the start of each chunk (last chunk may be shorter).
+    #region Constructor and Clear
 
     public ChunkBufferPool(int chunkSize)
     {
@@ -57,4 +67,6 @@ internal sealed class ChunkBufferPool
         Array.Clear(PanTScaled1, 0, activeLength);
         Array.Clear(PanTScaled2, 0, activeLength);
     }
+
+    #endregion
 }

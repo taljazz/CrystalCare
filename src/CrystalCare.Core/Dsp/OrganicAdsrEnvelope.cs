@@ -12,11 +12,13 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public sealed class OrganicAdsrEnvelope
 {
-    private static readonly float[] FibRatios = [1.618f, 2.618f, 4.236f, 6.854f, 11.090f, 17.944f];
+    // Single source of truth — derived from PHI, not hardcoded truncations
+    private static readonly float[] FibRatios = SacredConstants.FIB_RATIOS;
 
-    /// <summary>
-    /// Pre-computed ADSR parameters drawn once at pipeline start.
-    /// </summary>
+    // Pre-computed ADSR parameters drawn once at pipeline start.
+    // Fibonacci-based durations with chaotic variation for organic uniqueness.
+    #region ADSR Parameters
+
     public sealed class AdsrParams
     {
         public int AttackSamples { get; init; }
@@ -32,9 +34,12 @@ public sealed class OrganicAdsrEnvelope
         public float OverallScale { get; init; }
     }
 
-    /// <summary>
-    /// Pre-compute ADSR parameters (called once at pipeline start).
-    /// </summary>
+    #endregion
+
+    // Draws random ADSR parameters using Fibonacci ratios and chaotic variation.
+    // Called once before the pipeline loop for session-wide consistency.
+    #region Parameter Computation
+
     public static AdsrParams ComputeParams(int totalSamples, int sampleRate,
         ChaoticSelector chaotic, Random? rng = null)
     {
@@ -75,9 +80,12 @@ public sealed class OrganicAdsrEnvelope
         };
     }
 
-    /// <summary>
-    /// Generate full ADSR envelope (batch mode).
-    /// </summary>
+    #endregion
+
+    // Full ADSR envelope generation for batch mode — produces the complete
+    // envelope array for the entire session in one call.
+    #region Batch Envelope Generation
+
     public static float[] Generate(int totalSamples, int sampleRate,
         ChaoticSelector chaotic, Simplex5D simplex, Random? rng = null)
     {
@@ -152,10 +160,13 @@ public sealed class OrganicAdsrEnvelope
         return envelope;
     }
 
-    /// <summary>
-    /// Compute envelope for a single chunk (streaming mode).
-    /// Uses global sample offset to determine which ADSR phase we're in.
-    /// </summary>
+    #endregion
+
+    // Per-chunk envelope computation for streaming mode. Uses global sample offset
+    // to determine which ADSR phase (attack/decay/sustain/release) each sample falls in.
+    // Simplex noise adds organic variation; wobble adds breathing to decay/sustain phases.
+    #region Streaming Chunk Computation
+
     public static void ComputeChunk(Span<float> output, int chunkOffset, int chunkSamples,
         AdsrParams p, Simplex5D simplex, int totalSamples)
     {
@@ -201,4 +212,6 @@ public sealed class OrganicAdsrEnvelope
             output[i] = value * p.OverallScale;
         }
     }
+
+    #endregion
 }

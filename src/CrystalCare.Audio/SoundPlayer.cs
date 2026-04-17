@@ -12,13 +12,28 @@ namespace CrystalCare.Audio;
 /// </summary>
 public sealed class SoundPlayer : IDisposable
 {
+    // Holds the sound generator (produces audio chunks) and the NAudio
+    // wave output device (plays them through speakers).
+    #region Fields and Constructor
+
+    // The 16-stage pipeline sound generator — produces stereo float chunks
     private readonly SoundGenerator _generator;
+
+    // NAudio wave output device — plays audio through the system's default output
     private IWavePlayer? _waveOut;
 
     public SoundPlayer(SoundGenerator generator)
     {
         _generator = generator;
     }
+
+    #endregion
+
+    // Real-time streaming playback using producer-consumer pattern.
+    // A background thread generates audio chunks and pushes them to a BlockingCollection.
+    // NAudio's playback thread pulls chunks via StreamingWaveProvider.
+    // Audio starts playing within ~0.2 seconds of pressing Play.
+    #region Streaming Playback
 
     /// <summary>
     /// Stream audio to speakers using producer-consumer pattern.
@@ -91,6 +106,13 @@ public sealed class SoundPlayer : IDisposable
         }
     }
 
+    #endregion
+
+    // WAV file saving — generates the full session in memory using batch mode,
+    // finds the global peak for normalization, then writes 16-bit PCM WAV
+    // in 10-second chunks via NAudio. Progress: 80% generation, 20% writing.
+    #region WAV File Saving
+
     /// <summary>
     /// Save audio to WAV file using batch generation.
     /// Two-pass: generate full array, find peak, write normalized int16.
@@ -152,6 +174,11 @@ public sealed class SoundPlayer : IDisposable
         }, ct);
     }
 
+    #endregion
+
+    // Stop playback and dispose NAudio resources.
+    #region Playback Control and Disposal
+
     /// <summary>
     /// Stop current playback immediately.
     /// </summary>
@@ -169,4 +196,6 @@ public sealed class SoundPlayer : IDisposable
         _waveOut?.Stop();
         _waveOut?.Dispose();
     }
+
+    #endregion
 }
