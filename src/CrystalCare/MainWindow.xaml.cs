@@ -7,6 +7,8 @@ using CrystalCare.Audio;
 using CrystalCare.Core.Frequencies;
 using CrystalCare.Core.Generation;
 using Microsoft.Win32;
+using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 using NAudio.Wave;
 
 namespace CrystalCare;
@@ -16,7 +18,7 @@ namespace CrystalCare;
 /// Handles all user interaction: Play, Save, Batch Save, Stop, and Guide.
 /// Uses WindowsFormsHost for a native Win32 TextBox that NVDA can navigate reliably.
 /// </summary>
-public partial class MainWindow : Window
+public partial class MainWindow : Window, IMMNotificationClient
 {
     // Core services and state for the application's audio pipeline and UI lifecycle.
     #region Fields
@@ -39,6 +41,11 @@ public partial class MainWindow : Window
     // Native Win32 multiline TextBox hosted via WindowsFormsHost — screen readers
     // (NVDA, JAWS) can navigate this with arrow keys, unlike WPF's LiveRegion
     private readonly System.Windows.Forms.TextBox _statusTextBox;
+
+    // MMDevice enumerator for real-time audio device notifications.
+    // Windows pushes device state change events through this, letting us
+    // update the dropdown instantly when a device is added, removed, or disabled.
+    private readonly MMDeviceEnumerator _deviceEnumerator = new();
 
     #endregion
 
@@ -75,6 +82,11 @@ public partial class MainWindow : Window
         // Populate the output device dropdown with all available audio devices
         PopulateDeviceList();
 
+        // Register for real-time device change notifications from Windows.
+        // When devices are added/removed/disabled, OnDeviceStateChanged fires
+        // and we refresh the dropdown on the UI thread.
+        _deviceEnumerator.RegisterEndpointNotificationCallback(this);
+
         UpdateStatus("CrystalCare ready. Select a frequency set and duration, then press Play.");
     }
 
@@ -91,7 +103,8 @@ public partial class MainWindow : Window
     /// </summary>
     private async void OnPlay_Click(object sender, RoutedEventArgs e)
     {
-        if (!ValidateAndParseDuration(out float duration)) return;
+        // Streaming playback has no RAM limit — allow unlimited duration
+        if (!ValidateAndParseDuration(out float duration, allowUnlimited: true)) return;
 
         // Cast the ComboBox index directly to FrequencyMode enum (values match 0-6)
         var mode = (FrequencyMode)FreqChoice.SelectedIndex;
@@ -349,6 +362,10 @@ public partial class MainWindow : Window
         _cts?.Cancel();
         _soundPlayer.StopPlayback();
         _soundPlayer.Dispose();
+
+        // Unregister from device notifications and dispose the enumerator
+        try { _deviceEnumerator.UnregisterEndpointNotificationCallback(this); } catch { }
+        _deviceEnumerator.Dispose();
     }
 
     #endregion
@@ -540,7 +557,12 @@ public partial class MainWindow : Window
     /// Must be a positive number no greater than 60 minutes.
     /// Returns false and shows an error if invalid.
     /// </summary>
-    private bool ValidateAndParseDuration(out float duration)
+    /// <summary>
+    /// Validate and parse the duration text field.
+    /// Must be a positive number. The 60-minute upper limit applies only to
+    /// save operations (which have RAM constraints) — streaming playback is unlimited.
+    /// </summary>
+    private bool ValidateAndParseDuration(out float duration, bool allowUnlimited = false)
     {
         duration = 0;
         string text = DurationText.Text.Trim();
@@ -559,14 +581,79 @@ public partial class MainWindow : Window
             return false;
         }
 
-        if (duration > 60)
+        // Only enforce the 60-minute cap for save/batch operations (RAM-bound).
+        // Streaming playback has no RAM limit — any length is supported.
+        if (!allowUnlimited && duration > 60)
         {
-            UpdateStatus("Error: Duration must be <= 60 minutes.");
+            UpdateStatus("Error: Duration must be <= 60 minutes for saves. Streaming playback is unlimited.");
             DurationText.Focus();
             return false;
         }
 
         return true;
+    }
+
+    #endregion
+
+    // IMMNotificationClient implementation — receives real-time audio device
+    // change notifications from Windows. When any device is added, removed,
+    // disabled, or changes default status, the dropdown refreshes automatically.
+    #region Device Change Notifications
+
+    /// <summary>
+    /// Fired when a device's state changes (plugged in, unplugged, disabled, enabled).
+    /// Refreshes the dropdown on the UI thread so changes appear instantly.
+    /// </summary>
+    public void OnDeviceStateChanged(string deviceId, DeviceState newState)
+    {
+        RefreshDeviceListOnUiThread();
+    }
+
+    /// <summary>
+    /// Fired when a new device is added to the system.
+    /// </summary>
+    public void OnDeviceAdded(string pwstrDeviceId)
+    {
+        RefreshDeviceListOnUiThread();
+    }
+
+    /// <summary>
+    /// Fired when a device is removed from the system.
+    /// </summary>
+    public void OnDeviceRemoved(string deviceId)
+    {
+        RefreshDeviceListOnUiThread();
+    }
+
+    /// <summary>
+    /// Fired when the default device changes (e.g., user picks a new default output).
+    /// </summary>
+    public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
+    {
+        RefreshDeviceListOnUiThread();
+    }
+
+    /// <summary>
+    /// Fired when a device's properties change. We don't need to refresh for this.
+    /// </summary>
+    public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)
+    {
+        // No refresh needed — device list hasn't changed, only a property value
+    }
+
+    /// <summary>
+    /// Marshal the refresh call to the UI thread. Device notifications arrive
+    /// on background threads, so we must dispatch UI updates through the Dispatcher.
+    /// </summary>
+    private void RefreshDeviceListOnUiThread()
+    {
+        if (_isClosing) return;
+
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (!_isClosing)
+                PopulateDeviceList();
+        });
     }
 
     #endregion
