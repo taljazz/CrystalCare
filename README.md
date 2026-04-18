@@ -1,4 +1,4 @@
-# CrystalCare — v4.4.2
+# CrystalCare — v4.4.3
 
 A dynamic sound healing application that generates evolving, spiral-based tones to balance, empower, protect, and energetically heal. Inspired by Lemurian crystalline healing traditions and built with modern mathematical modeling, CrystalCare creates immersive soundscapes that go beyond static binaural beats or isochronic tones.
 
@@ -90,6 +90,7 @@ For sessions longer than 60 seconds (or any length in Dimensional Journey mode),
 
 - Real-time streaming playback with instant audio start — unlimited session length supported
 - Output device selection — choose which audio device CrystalCare resonates through, with automatic real-time refresh when devices are plugged in or removed
+- Flexible duration entry — accepts plain minutes (`90`), hour/minute notation (`1h30m`), colon format (`1:30`), or combined units (`2h 15m 30s`)
 - WAV export with peak normalization
 - Batch save for generating multiple sessions
 - Accessible interface with screen reader support (WPF + NVDA compatible)

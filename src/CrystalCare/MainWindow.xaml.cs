@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -559,8 +561,9 @@ public partial class MainWindow : Window, IMMNotificationClient
     /// </summary>
     /// <summary>
     /// Validate and parse the duration text field.
-    /// Must be a positive number. The 60-minute upper limit applies only to
-    /// save operations (which have RAM constraints) — streaming playback is unlimited.
+    /// Accepts flexible formats and returns duration in minutes.
+    /// The 60-minute cap applies only to save operations (RAM-bound);
+    /// streaming playback is unlimited.
     /// </summary>
     private bool ValidateAndParseDuration(out float duration, bool allowUnlimited = false)
     {
@@ -574,9 +577,10 @@ public partial class MainWindow : Window, IMMNotificationClient
             return false;
         }
 
-        if (!float.TryParse(text, out duration) || duration <= 0)
+        // Try parsing with flexible format support
+        if (!TryParseDurationToMinutes(text, out duration) || duration <= 0)
         {
-            UpdateStatus("Error: Duration must be positive.");
+            UpdateStatus("Error: Invalid duration. Examples: 90 (90 min), 1h30m, 1:30, 2h, 30s.");
             DurationText.Focus();
             return false;
         }
@@ -591,6 +595,94 @@ public partial class MainWindow : Window, IMMNotificationClient
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Parse a flexible duration string into minutes.
+    /// Supported formats:
+    ///   "90"        → 90 minutes (plain number, backward compatible)
+    ///   "1.5h"      → 1.5 hours = 90 minutes
+    ///   "1h30m"     → 1 hour 30 minutes = 90 minutes
+    ///   "1h 30m"    → 1 hour 30 minutes = 90 minutes
+    ///   "2h"        → 2 hours = 120 minutes
+    ///   "30s"       → 30 seconds = 0.5 minutes
+    ///   "1:30"      → 1 hour 30 minutes = 90 minutes
+    ///   "1:30:45"   → 1 hour 30 minutes 45 seconds = 90.75 minutes
+    ///   "2h 15m 30s"→ 2 hours 15 minutes 30 seconds = 135.5 minutes
+    /// </summary>
+    private static bool TryParseDurationToMinutes(string text, out float minutes)
+    {
+        minutes = 0;
+        text = text.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(text)) return false;
+
+        // Plain number → minutes (backward compatibility with old single-unit input)
+        if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float plainMinutes))
+        {
+            minutes = plainMinutes;
+            return true;
+        }
+
+        // Colon-separated format (HH:MM or HH:MM:SS)
+        if (text.Contains(':'))
+        {
+            var parts = text.Split(':');
+            if (parts.Length == 2 &&
+                float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float hh1) &&
+                float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float mm1))
+            {
+                minutes = hh1 * 60 + mm1;
+                return true;
+            }
+            if (parts.Length == 3 &&
+                float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float hh2) &&
+                float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float mm2) &&
+                float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float ss2))
+            {
+                minutes = hh2 * 60 + mm2 + ss2 / 60f;
+                return true;
+            }
+            return false;
+        }
+
+        // Suffix-based format (1h30m, 2h, 30s, etc.)
+        // Extract hours — number followed by 'h' (not part of another word)
+        float total = 0;
+        bool foundAny = false;
+
+        var hMatch = Regex.Match(text, @"(\d+\.?\d*)\s*h");
+        if (hMatch.Success &&
+            float.TryParse(hMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float hours))
+        {
+            total += hours * 60;
+            foundAny = true;
+        }
+
+        // Extract minutes — number followed by 'm' but not 'ms' (milliseconds not supported)
+        var mMatch = Regex.Match(text, @"(\d+\.?\d*)\s*m(?!s)");
+        if (mMatch.Success &&
+            float.TryParse(mMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float min))
+        {
+            total += min;
+            foundAny = true;
+        }
+
+        // Extract seconds — number followed by 's'
+        var sMatch = Regex.Match(text, @"(\d+\.?\d*)\s*s");
+        if (sMatch.Success &&
+            float.TryParse(sMatch.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float sec))
+        {
+            total += sec / 60f;
+            foundAny = true;
+        }
+
+        if (foundAny)
+        {
+            minutes = total;
+            return true;
+        }
+
+        return false;
     }
 
     #endregion

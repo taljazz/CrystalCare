@@ -32,11 +32,11 @@
             </GroupBox>
 
             <!-- Duration Input -->
-            <GroupBox Header="Session Duration (Minutes)" Margin="0,0,0,5"
+            <GroupBox Header="Session Duration" Margin="0,0,0,5"
                       AutomationProperties.Name="Session Duration">
                 <TextBox x:Name="DurationText" Margin="10"
-                         AutomationProperties.Name="Duration in minutes"
-                         ToolTip="Enter the duration of the session in minutes (max 60)." />
+                         AutomationProperties.Name="Session duration"
+                         ToolTip="Enter duration in flexible formats: 90 = 90 minutes, 1h30m = 1 hour 30 minutes, 1:30 = 1 hour 30 minutes, 2h = 2 hours, 30s = 30 seconds. Streaming is unlimited; saves are capped at 60 minutes." />
             </GroupBox>
 
             <!-- Output Device Selection -->
