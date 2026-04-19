@@ -88,7 +88,7 @@ For sessions longer than 60 seconds (or any length in Dimensional Journey mode),
 
 ## Features
 
-- Real-time streaming playback with instant audio start — unlimited session length supported
+- Real-time streaming playback with instant audio start — unlimited session length with stable resonance maintained through double-precision time arithmetic (sessions of any duration, even 12+ hours, retain perfect phase accuracy)
 - Output device selection — choose which audio device CrystalCare resonates through, with automatic real-time refresh when devices are plugged in or removed
 - Flexible duration entry — accepts plain minutes (`90`), hour/minute notation (`1h30m`), colon format (`1:30`), or combined units (`2h 15m 30s`)
 - WAV export with peak normalization
