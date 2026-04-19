@@ -36,15 +36,15 @@ public sealed class WaterElementLayer : SacredLayerBase
     // Standing wave resonance at Schumann × Schumann*PHI adds harmonic depth.
     #region Signal Generation
 
-    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+    protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
         var simplex = Simplex.Value!;
 
-        // Simplex perturbation for organic observer drift
+        // Simplex perturbation for organic observer drift — scaled time stays small
         var tScaled = new float[n];
         for (int i = 0; i < n; i++)
-            tScaled[i] = tChunk[i] * 0.005f;
+            tScaled[i] = (float)(tChunk[i] * 0.005);
         var thetaPerturb = simplex.GenerateNoise(tScaled, 0.4f);
         for (int i = 0; i < n; i++)
             thetaPerturb[i] *= 0.15f;
@@ -54,20 +54,21 @@ public sealed class WaterElementLayer : SacredLayerBase
         var hexPhases = SacredConstants.WATER_HEX_PHASES;
         var positions = SacredConstants.WATER_SOURCE_POSITIONS;
 
-        // Accumulate wave interference from 7 sources
+        // Accumulate wave interference from 7 sources — double precision phase
         var result = new float[n];
 
         for (int s = 0; s < 7; s++)
         {
             float srcX = positions[s, 0];
             float srcY = positions[s, 1];
+            double sourceFreq = sourceFreqs[s];
 
             for (int i = 0; i < n; i++)
             {
-                // Lemniscate path (figure-8)
-                float theta = SacredConstants.TWO_PI * 0.005f * tChunk[i] + thetaPerturb[i];
-                float sinT = MathF.Sin(theta);
-                float cosT = MathF.Cos(theta);
+                // Lemniscate path (figure-8) — slow rate at 0.005 Hz, compute in double
+                double theta = SacredConstants.TWO_PI_D * 0.005 * tChunk[i] + thetaPerturb[i];
+                float sinT = (float)System.Math.Sin(theta);
+                float cosT = (float)System.Math.Cos(theta);
                 float denom = 1.0f + sinT * sinT;
                 float obsX = 0.7f * cosT / denom;
                 float obsY = 0.7f * sinT * cosT / denom;
@@ -80,8 +81,8 @@ public sealed class WaterElementLayer : SacredLayerBase
                 // Spatial envelope: exponential decay with distance
                 float envelope = MathF.Exp(-sourceDecays[s] * dist * 10.0f);
 
-                // Wave from this source
-                float wave = MathF.Sin(SacredConstants.TWO_PI * sourceFreqs[s] * tChunk[i] + hexPhases[s]);
+                // Wave from this source — double precision phase
+                float wave = (float)System.Math.Sin(SacredConstants.TWO_PI_D * sourceFreq * tChunk[i] + hexPhases[s]);
                 result[i] += wave * envelope;
             }
         }
@@ -92,18 +93,18 @@ public sealed class WaterElementLayer : SacredLayerBase
 
         // Tidal modulation: slow simplex-driven amplitude (~200s period)
         for (int i = 0; i < n; i++)
-            tScaled[i] = tChunk[i] * 0.0005f;
+            tScaled[i] = (float)(tChunk[i] * 0.0005);
         var tidal = simplex.GenerateNoise(tScaled, 0.9f);
         for (int i = 0; i < n; i++)
             result[i] *= 0.85f + 0.15f * tidal[i];
 
-        // Standing wave resonance: Schumann x Schumann*PHI
-        const float schumannPhi = SacredConstants.SCHUMANN * SacredConstants.PHI;
+        // Standing wave resonance: Schumann x Schumann*PHI — double precision phase
+        const double schumannPhi = SacredConstants.SCHUMANN * SacredConstants.PHI;
         for (int i = 0; i < n; i++)
         {
             float standing = 0.1f *
-                MathF.Sin(SacredConstants.TWO_PI * SacredConstants.SCHUMANN * tChunk[i]) *
-                MathF.Cos(SacredConstants.TWO_PI * schumannPhi * tChunk[i]);
+                (float)System.Math.Sin(SacredConstants.TWO_PI_D * SacredConstants.SCHUMANN * tChunk[i]) *
+                (float)System.Math.Cos(SacredConstants.TWO_PI_D * schumannPhi * tChunk[i]);
             result[i] += standing;
         }
 

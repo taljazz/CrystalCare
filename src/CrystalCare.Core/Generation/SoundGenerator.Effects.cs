@@ -66,7 +66,7 @@ public sealed partial class SoundGenerator
     /// Uses pooled buffers for panCurve, tScaled1, and tScaled2 to avoid allocation.
     /// </summary>
     private static void ApplyToroidalPanning(float[] waveLeft, float[] waveRight,
-        ReadOnlySpan<float> tChunk, int chunkSamples,
+        ReadOnlySpan<double> tChunk, int chunkSamples,
         float thetaFreq, float phiFreq, float R, float r,
         Simplex5D simplexPan, Math.RosslerAttractor.Trajectory rossler,
         ExponentialSmoother panSmoother, float driftFreq, float driftAmp,
@@ -77,36 +77,38 @@ public sealed partial class SoundGenerator
         var tScaled1 = pool.PanTScaled1;
         var tScaled2 = pool.PanTScaled2;
 
-        // Scale time arrays for simplex noise at two different rates
+        // Scale time arrays for simplex noise at two different rates.
+        // Scaled values stay small enough for float32 precision.
         for (int i = 0; i < chunkSamples; i++)
         {
-            tScaled1[i] = tChunk[i] * 0.005f;  // Slower simplex variation
-            tScaled2[i] = tChunk[i] * 0.007f;  // Slightly faster, orthogonal variation
+            tScaled1[i] = (float)(tChunk[i] * 0.005);  // Slower simplex variation
+            tScaled2[i] = (float)(tChunk[i] * 0.007);  // Slightly faster, orthogonal variation
         }
 
         // Generate simplex noise for organic angular perturbation
         var thetaPerturb = simplexPan.GenerateNoise(tScaled1);
         var phiPerturb = simplexPan.GenerateNoise(tScaled2, 1.0f);
 
-        // Compute the raw toroidal pan curve with chaos and simplex perturbation
+        // Compute the raw toroidal pan curve with chaos and simplex perturbation.
+        // Double precision phase for long-session stability.
         for (int i = 0; i < chunkSamples; i++)
         {
-            float time = tChunk[i];
+            double time = tChunk[i];
 
             // Simplex perturbation: ±0.10 radians of organic angular drift
-            float tp = 0.10f * thetaPerturb[i];
-            float pp = 0.10f * phiPerturb[i];
+            double tp = 0.10f * thetaPerturb[i];
+            double pp = 0.10f * phiPerturb[i];
 
-            // Rössler chaotic perturbation: ±0.08 radians of bounded chaos
-            tp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.X, rossler.T, time);
-            pp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.Y, rossler.T, time);
+            // Rössler chaotic perturbation: ±0.08 radians of bounded chaos (Interpolate takes float)
+            tp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.X, rossler.T, (float)time);
+            pp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.Y, rossler.T, (float)time);
 
-            // Compute torus position: theta (horizontal) and phi (depth)
-            float theta = SacredConstants.TWO_PI * thetaFreq * time + tp;
-            float phi = SacredConstants.TWO_PI * phiFreq * time + pp;
+            // Compute torus position in double: theta (horizontal) and phi (depth)
+            double theta = SacredConstants.TWO_PI_D * thetaFreq * time + tp;
+            double phi = SacredConstants.TWO_PI_D * phiFreq * time + pp;
 
             // Map torus position to mono pan value: x-projection of torus surface point
-            panCurve[i] = (R + r * MathF.Cos(phi)) * MathF.Cos(theta) / (R + r);
+            panCurve[i] = (float)((R + r * System.Math.Cos(phi)) * System.Math.Cos(theta) / (R + r));
         }
 
         // Ultra-slow smoothing (0.002 Hz) — only the slowest drift survives
@@ -115,9 +117,9 @@ public sealed partial class SoundGenerator
         // Tanh soft-clipping to keep pan within [-0.8, 0.8] with gentle saturation
         WaveShaper.PanCurveTanh(panCurve, 0.6f, -0.8f, 0.8f);
 
-        // Add slow sine drift for additional gentle stereo movement
+        // Add slow sine drift for additional gentle stereo movement (double phase)
         for (int i = 0; i < chunkSamples; i++)
-            panCurve[i] += driftAmp * MathF.Sin(SacredConstants.TWO_PI * driftFreq * tChunk[i]);
+            panCurve[i] += driftAmp * (float)System.Math.Sin(SacredConstants.TWO_PI_D * driftFreq * tChunk[i]);
 
         // Apply the computed pan curve to the stereo signal
         for (int i = 0; i < chunkSamples; i++)

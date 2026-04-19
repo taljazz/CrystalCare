@@ -37,20 +37,20 @@ public sealed class LemurianMerkabaLayer : SacredLayerBase
     // the Merkaba structure at 0.0006 sub-perceptual scale.
     #region Signal Generation
 
-    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+    protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
         var simplex = Simplex.Value!;
 
-        // Organic phase wobble from simplex noise
+        // Organic phase wobble from simplex noise — scaled time stays small for float
         var tScaled = new float[n];
         for (int i = 0; i < n; i++)
-            tScaled[i] = tChunk[i] * 0.03f;
+            tScaled[i] = (float)(tChunk[i] * 0.03);
         var wobble = simplex.GenerateNoise(tScaled, 0.7f, 0.3f);
         for (int i = 0; i < n; i++)
             wobble[i] *= 0.015f;
 
-        // Generate 4 Merkaba tones
+        // Generate 4 Merkaba tones — double precision phase for long-session stability
         var freqs = SacredConstants.MERKABA_FREQS;
         var phases = SacredConstants.MERKABA_PHASES;
         var weights = SacredConstants.MERKABA_WEIGHTS;
@@ -58,9 +58,11 @@ public sealed class LemurianMerkabaLayer : SacredLayerBase
         var merkaba = new float[n];
         for (int f = 0; f < 4; f++)
         {
+            double freq = freqs[f];
+            float phase = phases[f];
             for (int i = 0; i < n; i++)
-                merkaba[i] += weights[f] * MathF.Sin(
-                    SacredConstants.TWO_PI * freqs[f] * tChunk[i] + phases[f] + wobble[i]);
+                merkaba[i] += weights[f] * (float)System.Math.Sin(
+                    SacredConstants.TWO_PI_D * freq * tChunk[i] + phase + wobble[i]);
         }
 
         // Flower of Life geometric modulation — sacred geometry enriching the Merkaba

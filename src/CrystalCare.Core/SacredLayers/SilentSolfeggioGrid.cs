@@ -31,36 +31,36 @@ public sealed class SilentSolfeggioGrid : SacredLayerBase
     // for organic, breathing modulation. PHI-modulated secondary pulsing adds depth.
     #region Signal Generation
 
-    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+    protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
-        // Solfeggio grid: sum of 12 solfeggio frequencies
+        // Solfeggio grid: sum of 12 solfeggio frequencies — double precision phase
         var solfeggioGrid = new float[n];
         var solfeggio = SacredConstants.SOLFEGGIO;
         for (int s = 0; s < solfeggio.Length; s++)
         {
-            float freq = solfeggio[s];
+            double freq = solfeggio[s];
             for (int i = 0; i < n; i++)
-                solfeggioGrid[i] += MathF.Sin(SacredConstants.TWO_PI * freq * tChunk[i]);
+                solfeggioGrid[i] += (float)System.Math.Sin(SacredConstants.TWO_PI_D * freq * tChunk[i]);
         }
 
-        // Tesla 3-6-9 vortex grid
+        // Tesla 3-6-9 vortex grid — double precision phase
         var teslaGrid = new float[n];
         var tesla = SacredConstants.TESLA_VORTEX;
         for (int s = 0; s < tesla.Length; s++)
         {
-            float freq = tesla[s];
+            double freq = tesla[s];
             for (int i = 0; i < n; i++)
-                teslaGrid[i] += MathF.Sin(SacredConstants.TWO_PI * freq * tChunk[i]);
+                teslaGrid[i] += (float)System.Math.Sin(SacredConstants.TWO_PI_D * freq * tChunk[i]);
         }
 
-        // Fibonacci amplitude (smooth sine modulation)
-        const float fibCycleFreq = 0.004f;
+        // Fibonacci amplitude (smooth sine modulation) — double precision
+        const double fibCycleFreq = 0.004;
         var combined = new float[n];
         for (int i = 0; i < n; i++)
         {
-            float fibAmp = 0.95f + 0.05f * MathF.Sin(SacredConstants.TWO_PI * fibCycleFreq * tChunk[i]);
-            fibAmp += 0.02f * MathF.Sin(SacredConstants.TWO_PI * fibCycleFreq * SacredConstants.PHI * tChunk[i]);
+            float fibAmp = 0.95f + 0.05f * (float)System.Math.Sin(SacredConstants.TWO_PI_D * fibCycleFreq * tChunk[i]);
+            fibAmp += 0.02f * (float)System.Math.Sin(SacredConstants.TWO_PI_D * fibCycleFreq * SacredConstants.PHI * tChunk[i]);
             fibAmp = global::System.Math.Clamp(fibAmp, 0.88f, 1.0f);
 
             combined[i] = (0.6f * solfeggioGrid[i] + 0.4f * teslaGrid[i]) * fibAmp;

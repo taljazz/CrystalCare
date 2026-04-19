@@ -48,7 +48,7 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
     // 0.1% fractal micro-variation adds organic aliveness to each crystal.
     #region Signal Generation
 
-    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+    protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
         var simplex = Simplex.Value!;
@@ -66,6 +66,7 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
         // Golden angle crystal timing — each crystal's segment boundary is placed
         // at golden-angle fractions of the total duration, like seeds on a sunflower.
         // This prevents the mind from predicting transitions.
+        // segmentBoundaries are in seconds (float is fine here — bounded by totalDuration).
         float avgSegment = totalDuration / numCrystals;
         var segBoundaries = new float[numCrystals + 1];
         segBoundaries[0] = 0;
@@ -96,7 +97,7 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
             float soloStart = ci > 0 ? segStart + halfXfade : 0;
             float soloEnd = ci < numCrystals - 1 ? segEnd - halfXfade : totalDuration;
 
-            // Find samples in this crystal's active range
+            // Find samples in this crystal's active range (double comparison)
             int firstIdx = -1, lastIdx = -1;
             for (int i = 0; i < n; i++)
             {
@@ -109,11 +110,12 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
             if (firstIdx < 0) continue;
 
             int segLen = lastIdx - firstIdx + 1;
-            var tSeg = new float[segLen];
+            // tSeg is a double[] for precision-preserving harmonic generation
+            var tSeg = new double[segLen];
             for (int i = 0; i < segLen; i++)
                 tSeg[i] = tChunk[firstIdx + i];
 
-            // Generate crystal harmonics for this segment
+            // Generate crystal harmonics for this segment (double time preserves precision)
             var wave = CrystalProfileLibrary.GenerateHarmonics(tSeg, _baseFreq, profile, simplex);
 
             // Fractal micro-variation: subtle organic aliveness (0.1% modulation)
@@ -121,10 +123,10 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
             for (int i = 0; i < segLen; i++)
                 wave[i] *= (1.0f + microVar[i] * 0.001f);
 
-            // Crossfade weights
+            // Crossfade weights — cast tSeg double values to float for comparison (crossfade precision is not critical)
             for (int i = 0; i < segLen; i++)
             {
-                float t = tSeg[i];
+                float t = (float)tSeg[i];
                 float weight = 1.0f;
 
                 if (ci > 0 && crossfadeDur > 0 && t < soloStart)

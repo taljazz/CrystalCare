@@ -15,8 +15,13 @@ internal sealed class ChunkBufferPool
     // Allocated once at chunkSize; zeroed to activeLength each iteration via Clear().
     #region Pooled Buffers
 
-    /// <summary>Time values for the current chunk.</summary>
-    public float[] TChunk { get; }
+    /// <summary>
+    /// Time values for the current chunk, in seconds.
+    /// Stored as double to maintain precision over long sessions (hours):
+    /// float32 loses sub-millisecond resolution above ~1 hour of playback,
+    /// causing staircase quantization in sine generation.
+    /// </summary>
+    public double[] TChunk { get; }
 
     /// <summary>ADSR envelope values.</summary>
     public float[] Envelope { get; }
@@ -24,8 +29,8 @@ internal sealed class ChunkBufferPool
     /// <summary>Delayed right channel for stereo widening.</summary>
     public float[] WaveRightDelayed { get; }
 
-    /// <summary>Offset time array for right-channel noise.</summary>
-    public float[] TChunkOffset { get; }
+    /// <summary>Offset time array for right-channel noise (double for long-session precision).</summary>
+    public double[] TChunkOffset { get; }
 
     /// <summary>Pan curve for toroidal panning.</summary>
     public float[] PanCurve { get; }
@@ -44,10 +49,13 @@ internal sealed class ChunkBufferPool
 
     public ChunkBufferPool(int chunkSize)
     {
-        TChunk = new float[chunkSize];
+        // Time arrays use double for long-session precision
+        TChunk = new double[chunkSize];
+        TChunkOffset = new double[chunkSize];
+
+        // Signal/envelope arrays stay as float (no precision-over-time issue)
         Envelope = new float[chunkSize];
         WaveRightDelayed = new float[chunkSize];
-        TChunkOffset = new float[chunkSize];
         PanCurve = new float[chunkSize];
         PanTScaled1 = new float[chunkSize];
         PanTScaled2 = new float[chunkSize];

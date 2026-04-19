@@ -40,22 +40,23 @@ public static class MicrotonalLfo
     /// <summary>
     /// Compute LFO values for a time array using pre-drawn parameters.
     /// </summary>
-    public static float[] Compute(ReadOnlySpan<float> t, LfoParams p)
+    public static float[] Compute(ReadOnlySpan<double> t, LfoParams p)
     {
         var result = new float[t.Length];
         for (int i = 0; i < t.Length; i++)
         {
             // Drift: 1/89 (Fibonacci) amplitude at 0.1 Hz (HeartMath heart coherence)
+            // Double precision for phase, cast sin result to float
             float drift = SacredConstants.LFO_DRIFT_AMP *
-                MathF.Sin(SacredConstants.BREATH_HEART_COHERENCE * MathF.PI * t[i]);
+                (float)System.Math.Sin(SacredConstants.BREATH_HEART_COHERENCE * System.Math.PI * t[i]);
 
             // Inner modulation: 1/PHI² depth — golden ratio squared reciprocal
             float innerMod = SacredConstants.LFO_INNER_MOD_DEPTH *
-                MathF.Sin(SacredConstants.TWO_PI * p.Lfo2Freq * t[i]);
+                (float)System.Math.Sin(SacredConstants.TWO_PI_D * p.Lfo2Freq * t[i]);
 
             // Combined LFO: depth + drift, modulated by lfo1 with inner phase modulation
             result[i] = (p.Depth + drift) *
-                (1.0f + MathF.Sin(SacredConstants.TWO_PI * p.Lfo1Freq * t[i] + innerMod));
+                (1.0f + (float)System.Math.Sin(SacredConstants.TWO_PI_D * p.Lfo1Freq * t[i] + innerMod));
         }
         return result;
     }
@@ -63,7 +64,7 @@ public static class MicrotonalLfo
     /// <summary>
     /// Single-call LFO generation (for batch/non-streaming use).
     /// </summary>
-    public static float[] Generate(ReadOnlySpan<float> t, float baseFrequency, Random? rng = null)
+    public static float[] Generate(ReadOnlySpan<double> t, float baseFrequency, Random? rng = null)
     {
         return Compute(t, DrawParams(baseFrequency, rng));
     }

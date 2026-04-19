@@ -39,7 +39,7 @@ public sealed class PleromaMercyLayer : SacredLayerBase
     // Combined: 50% aeonic + 30% ogdoad + 20% archon mercy.
     #region Signal Generation
 
-    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+    protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
         var simplex = Simplex.Value!;
@@ -48,32 +48,32 @@ public sealed class PleromaMercyLayer : SacredLayerBase
         var aeonic = SacredConstants.AEONIC_EXPONENTS;
         var pentPhases = SacredConstants.PENTAGONAL_PHASES;
 
-        // Phase wobble from simplex noise
+        // Phase wobble from simplex noise — simplex input scaled to small float values
         var tScaled = new float[n];
         for (int i = 0; i < n; i++)
-            tScaled[i] = tChunk[i] * 0.00003f;
+            tScaled[i] = (float)(tChunk[i] * 0.00003);
         var phaseWobble = simplex.GenerateNoise(tScaled);
         for (int i = 0; i < n; i++)
             phaseWobble[i] *= 0.08f;
 
-        // Sum 13 aeonic harmonics
+        // Sum 13 aeonic harmonics — double precision phase for long-session stability
         var aeonicWave = new float[n];
         for (int h = 0; h < 13; h++)
         {
-            float freq = SacredConstants.SCHUMANN * aeonic[h];
+            double freq = SacredConstants.SCHUMANN * aeonic[h];
             float phase = pentPhases[h % 5];
             for (int i = 0; i < n; i++)
-                aeonicWave[i] += MathF.Sin(SacredConstants.TWO_PI * freq * tChunk[i] +
+                aeonicWave[i] += (float)System.Math.Sin(SacredConstants.TWO_PI_D * freq * tChunk[i] +
                     phase + phaseWobble[i]);
         }
 
         // Layer 2: Ogdoad Gateway
         for (int i = 0; i < n; i++)
-            tScaled[i] = tChunk[i] * 0.00001f;
+            tScaled[i] = (float)(tChunk[i] * 0.00001);
         var ogdoadPhase = simplex.GenerateNoise(tScaled, 1f, 1f, 1f, 1f);
         var ogdoadWave = new float[n];
         for (int i = 0; i < n; i++)
-            ogdoadWave[i] = MathF.Sin(SacredConstants.TWO_PI * SacredConstants.OGDOAD_FREQ *
+            ogdoadWave[i] = (float)System.Math.Sin(SacredConstants.TWO_PI_D * SacredConstants.OGDOAD_FREQ *
                 tChunk[i] + ogdoadPhase[i] * 0.05f);
 
         // Layer 3: Archon Harmonizing
@@ -91,9 +91,10 @@ public sealed class PleromaMercyLayer : SacredLayerBase
         for (int j = 0; j < 7; j++)
         {
             float archonPhase = pentPhases[j % 5];
+            double archonFreq = archonSpheres[j];
             for (int i = 0; i < n; i++)
-                archonMercy[i] += archonAmps[j] * MathF.Sin(
-                    SacredConstants.TWO_PI * archonSpheres[j] * tChunk[i] + archonPhase);
+                archonMercy[i] += archonAmps[j] * (float)System.Math.Sin(
+                    SacredConstants.TWO_PI_D * archonFreq * tChunk[i] + archonPhase);
         }
 
         // Combine: 0.5 aeonic + 0.3 ogdoad + 0.2 archon
@@ -116,12 +117,12 @@ public sealed class PleromaMercyLayer : SacredLayerBase
     // Earth's heartbeat as a scalar modulation on the Pleroma signal.
     #region Post-Processing (Cosine Nulling)
 
-    protected override void PostProcess(float[] signal, ReadOnlySpan<float> tChunk, int n)
+    protected override void PostProcess(float[] signal, ReadOnlySpan<double> tChunk, int n)
     {
-        // Cosine nulling (scalar imprint)
+        // Cosine nulling (scalar imprint) — double precision phase
         for (int i = 0; i < n; i++)
-            signal[i] *= MathF.Cos(SacredConstants.TWO_PI *
-                (SacredConstants.SCHUMANN / 1000f) * tChunk[i]);
+            signal[i] *= (float)System.Math.Cos(SacredConstants.TWO_PI_D *
+                (SacredConstants.SCHUMANN / 1000.0) * tChunk[i]);
     }
 
     #endregion

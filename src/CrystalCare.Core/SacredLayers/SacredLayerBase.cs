@@ -67,7 +67,7 @@ public abstract class SacredLayerBase : ISacredLayer
     /// Compute the sacred layer's audio for one chunk.
     /// Called by SoundGenerator for each 3-second chunk during sessions >60s.
     /// </summary>
-    public float[] ComputeChunk(ReadOnlySpan<float> tChunk, float totalDuration)
+    public float[] ComputeChunk(ReadOnlySpan<double> tChunk, float totalDuration)
     {
         // Return silence if the session is too short for this layer
         if (totalDuration < MinDuration)
@@ -85,10 +85,11 @@ public abstract class SacredLayerBase : ISacredLayer
         {
             // Group B (Merkaba, Water): apply breath modulation first, then fade + scale.
             // This order gives the breath more presence before the fade attenuates it.
+            // Double precision phase for long-session stability.
             for (int i = 0; i < n; i++)
             {
                 float breath = BreathCenter + BreathDepth *
-                    MathF.Sin(SacredConstants.TWO_PI * BreathFreq * tChunk[i]);
+                    (float)System.Math.Sin(SacredConstants.TWO_PI_D * BreathFreq * tChunk[i]);
                 signal[i] *= breath;
             }
             for (int i = 0; i < n; i++)
@@ -101,7 +102,7 @@ public abstract class SacredLayerBase : ISacredLayer
             for (int i = 0; i < n; i++)
             {
                 float breath = BreathCenter + BreathDepth *
-                    MathF.Sin(SacredConstants.TWO_PI * BreathFreq * tChunk[i]);
+                    (float)System.Math.Sin(SacredConstants.TWO_PI_D * BreathFreq * tChunk[i]);
                 signal[i] *= fade[i] * breath * OutputScale;
             }
         }
@@ -122,8 +123,9 @@ public abstract class SacredLayerBase : ISacredLayer
     /// <summary>
     /// Generate the unique signal for this sacred layer.
     /// Called by the template method before fade/breath/scale are applied.
+    /// Time is double precision for long-session phase accuracy.
     /// </summary>
-    protected abstract float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+    protected abstract float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n);
 
     /// <summary>
@@ -131,7 +133,7 @@ public abstract class SacredLayerBase : ISacredLayer
     /// Override in subclasses that need additional processing
     /// (e.g., Pleroma's cosine nulling scalar imprint).
     /// </summary>
-    protected virtual void PostProcess(float[] signal, ReadOnlySpan<float> tChunk, int n) { }
+    protected virtual void PostProcess(float[] signal, ReadOnlySpan<double> tChunk, int n) { }
 
     #endregion
 }

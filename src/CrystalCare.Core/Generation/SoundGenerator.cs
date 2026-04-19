@@ -240,11 +240,14 @@ public sealed partial class SoundGenerator
             // Zero the pooled buffers for this chunk (last chunk may be shorter)
             pool.Clear(chunkSamples);
 
-            // Build the absolute time array for this chunk's sample positions
-            float tStart = (float)chunkOffset / sampleRate;
+            // Build the absolute time array for this chunk's sample positions.
+            // Using double precision for the time array prevents staircase
+            // quantization at long session times (hours) where float32 loses
+            // sub-millisecond resolution.
+            double tStart = (double)chunkOffset / sampleRate;
             var tChunk = pool.TChunk;
             for (int i = 0; i < chunkSamples; i++)
-                tChunk[i] = tStart + (float)i / sampleRate;
+                tChunk[i] = tStart + (double)i / sampleRate;
 
             // Stage 1: Geometric modulation — sum of sine waves at sacred ratio frequencies
             var modulation = ComputeModulationChunk(tChunk, chunkOffset, chunkSamples, schedule);
@@ -322,7 +325,7 @@ public sealed partial class SoundGenerator
             var noiseLeft = EvolvingNoiseLayer.Generate(tChunk, rng: _rng);
             var tChunkOffset = pool.TChunkOffset;
             for (int i = 0; i < chunkSamples; i++)
-                tChunkOffset[i] = tChunk[i] + noiseOffsetRight;
+                tChunkOffset[i] = tChunk[i] + noiseOffsetRight;  // double + float widens to double
             var noiseRight = EvolvingNoiseLayer.Generate(tChunkOffset, rng: _rng);
 
             // Mix noise into the signal and apply per-channel noise scaling
@@ -382,13 +385,15 @@ public sealed partial class SoundGenerator
 
                     for (int i = 0; i < chunkSamples; i++)
                     {
-                        // Compute torus position with golden angle phase offset
-                        float sTheta = SacredConstants.TWO_PI * stFreq * tChunk[i] + phaseOff;
-                        float sPhi = SacredConstants.TWO_PI * spFreq * tChunk[i] + phaseOff;
+                        // Compute torus position with golden angle phase offset.
+                        // Use double precision for the TWO_PI × freq × t multiplication
+                        // to preserve phase accuracy over long sessions.
+                        double sThetaD = SacredConstants.TWO_PI_D * stFreq * tChunk[i] + phaseOff;
+                        double sPhiD = SacredConstants.TWO_PI_D * spFreq * tChunk[i] + phaseOff;
 
                         // Map torus position to stereo pan value
-                        float sacredPan = (sacredR + sacredRSmall * MathF.Cos(sPhi)) *
-                            MathF.Cos(sTheta) / (sacredR + sacredRSmall);
+                        float sacredPan = (sacredR + sacredRSmall * (float)System.Math.Cos(sPhiD)) *
+                            (float)System.Math.Cos(sThetaD) / (sacredR + sacredRSmall);
                         float panScaled = sacredPan * 0.4f;
 
                         // Mix into left and right channels with pan weighting

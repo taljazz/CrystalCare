@@ -53,7 +53,7 @@ public static class ToroidalPanner
     /// Compute stereo gains for a chunk using toroidal panning + Rössler chaos.
     /// Writes left and right gain arrays.
     /// </summary>
-    public static void ComputeChunk(ReadOnlySpan<float> tChunk,
+    public static void ComputeChunk(ReadOnlySpan<double> tChunk,
         PanParams panParams, RosslerAttractor.Trajectory? rossler,
         Simplex5D? panSimplex,
         Span<float> gainLeft, Span<float> gainRight)
@@ -64,22 +64,22 @@ public static class ToroidalPanner
 
         for (int i = 0; i < tChunk.Length; i++)
         {
-            float time = tChunk[i];
+            double time = tChunk[i];
 
-            // Base toroidal angles
-            float theta = SacredConstants.TWO_PI * panParams.ThetaFreq * time;
-            float phi = SacredConstants.TWO_PI * panParams.PhiFreq * time;
+            // Base toroidal angles — double precision phase for long-session stability
+            double theta = SacredConstants.TWO_PI_D * panParams.ThetaFreq * time;
+            double phi = SacredConstants.TWO_PI_D * panParams.PhiFreq * time;
 
-            // Rössler chaotic perturbation (±0.08 radians)
+            // Rössler chaotic perturbation (±0.08 radians) — Interpolate takes float time
             if (rossler != null)
             {
-                theta += 0.08f * RosslerAttractor.Interpolate(rossler.X, rossler.T, time);
-                phi += 0.08f * RosslerAttractor.Interpolate(rossler.Y, rossler.T, time);
+                theta += 0.08f * RosslerAttractor.Interpolate(rossler.X, rossler.T, (float)time);
+                phi += 0.08f * RosslerAttractor.Interpolate(rossler.Y, rossler.T, (float)time);
             }
 
             // Toroidal to stereo: map to horizontal pan and depth
-            float panH = (R + r * MathF.Cos(phi)) * MathF.Cos(theta) / (R + r);
-            float depth = (R + r * MathF.Cos(phi)) / (R + r);
+            float panH = (float)((R + r * System.Math.Cos(phi)) * System.Math.Cos(theta) / (R + r));
+            float depth = (float)((R + r * System.Math.Cos(phi)) / (R + r));
 
             // Stereo gains from pan position
             float leftGain = MathF.Cos((panH + 1.0f) * piOver4) * depth;

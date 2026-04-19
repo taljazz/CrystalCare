@@ -12,35 +12,35 @@ public static class SacredFadeEnvelope
     /// <summary>
     /// Compute fade envelope for a chunk using absolute time positions.
     /// </summary>
-    public static float[] Compute(ReadOnlySpan<float> tChunk, float totalDuration,
+    public static float[] Compute(ReadOnlySpan<double> tChunk, float totalDuration,
         float fadeSeconds = 55.0f)
     {
         var envelope = new float[tChunk.Length];
 
         if (totalDuration < fadeSeconds * 2)
         {
-            // Short session: raised cosine
+            // Short session: raised cosine (double precision time for consistency)
             for (int i = 0; i < tChunk.Length; i++)
-                envelope[i] = 0.5f - 0.5f * MathF.Cos(SacredConstants.TWO_PI * tChunk[i] / totalDuration);
+                envelope[i] = (float)(0.5 - 0.5 * System.Math.Cos(SacredConstants.TWO_PI_D * tChunk[i] / totalDuration));
             return envelope;
         }
 
-        float fadeOutThreshold = totalDuration - fadeSeconds;
+        double fadeOutThreshold = totalDuration - fadeSeconds;
 
         for (int i = 0; i < tChunk.Length; i++)
         {
-            float t = tChunk[i];
+            double t = tChunk[i];
 
             if (t < fadeSeconds)
             {
                 // Fade in: Perlin smoother step
-                float x = t / fadeSeconds;
+                float x = (float)(t / fadeSeconds);
                 envelope[i] = x * x * x * (x * (x * 6.0f - 15.0f) + 10.0f);
             }
             else if (t > fadeOutThreshold)
             {
                 // Fade out: Perlin smoother step (inverted)
-                float x = global::System.Math.Clamp((totalDuration - t) / fadeSeconds, 0f, 1f);
+                float x = global::System.Math.Clamp((float)((totalDuration - t) / fadeSeconds), 0f, 1f);
                 envelope[i] = x * x * x * (x * (x * 6.0f - 15.0f) + 10.0f);
             }
             else

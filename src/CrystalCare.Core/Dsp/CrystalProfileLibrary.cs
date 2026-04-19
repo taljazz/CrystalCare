@@ -57,7 +57,7 @@ public sealed class CrystalProfileLibrary
     /// <summary>
     /// Generate harmonics for a single crystal profile at given time values.
     /// </summary>
-    public static float[] GenerateHarmonics(ReadOnlySpan<float> t, float baseFreq,
+    public static float[] GenerateHarmonics(ReadOnlySpan<double> t, float baseFreq,
         CrystalProfile profile, Simplex5D simplex)
     {
         var ratios = profile.HarmonicRatios;
@@ -65,13 +65,13 @@ public sealed class CrystalProfileLibrary
         int nRatios = ratios.Length;
         var result = new float[t.Length];
 
-        // Phase wobble from piezo effect
+        // Phase wobble from piezo effect — simplex takes float, scaled values stay small
         float[]? phaseWobble = null;
         if (profile.PiezoFactor > 0)
         {
             var tScaled = new float[t.Length];
             for (int i = 0; i < t.Length; i++)
-                tScaled[i] = t[i] * 0.015f;
+                tScaled[i] = (float)(t[i] * 0.015);
             phaseWobble = simplex.GenerateNoise(tScaled, 2.0f);
             for (int i = 0; i < phaseWobble.Length; i++)
                 phaseWobble[i] *= profile.PiezoFactor;
@@ -83,67 +83,67 @@ public sealed class CrystalProfileLibrary
         {
             var tScaled = new float[t.Length];
             for (int i = 0; i < t.Length; i++)
-                tScaled[i] = t[i] * 0.008f;
+                tScaled[i] = (float)(t[i] * 0.008);
             detuneNoise = simplex.GenerateNoise(tScaled, 3.0f);
         }
 
-        // Sum weighted harmonics
+        // Sum weighted harmonics — double precision phase for long-session stability
         for (int r = 0; r < nRatios; r++)
         {
-            float freq = baseFreq * ratios[r];
+            double freq = baseFreq * ratios[r];
             float weight = weights[r];
 
             for (int i = 0; i < t.Length; i++)
             {
-                float phase;
+                double phase;
                 if (detuneNoise != null)
                 {
-                    float detuneScale = (r + 1) * profile.DetuneFactor;
-                    phase = SacredConstants.TWO_PI * freq * (1.0f + detuneScale * detuneNoise[i]) * t[i];
+                    double detuneScale = (r + 1) * profile.DetuneFactor;
+                    phase = SacredConstants.TWO_PI_D * freq * (1.0 + detuneScale * detuneNoise[i]) * t[i];
                 }
                 else
                 {
-                    phase = SacredConstants.TWO_PI * freq * t[i];
+                    phase = SacredConstants.TWO_PI_D * freq * t[i];
                 }
 
                 if (phaseWobble != null)
                     phase += phaseWobble[i];
 
-                result[i] += weight * MathF.Sin(phase);
+                result[i] += weight * (float)System.Math.Sin(phase);
             }
         }
 
-        // Shimmer modulation
+        // Shimmer modulation — low frequency, use double for consistency
         if (profile.ShimmerRate > 0)
         {
             for (int i = 0; i < t.Length; i++)
             {
                 float shimmer = 1.0f + profile.ShimmerDepth *
-                    MathF.Sin(SacredConstants.TWO_PI * profile.ShimmerRate * t[i]);
+                    (float)System.Math.Sin(SacredConstants.TWO_PI_D * profile.ShimmerRate * t[i]);
                 result[i] *= shimmer;
             }
         }
 
-        // Beating pairs
+        // Beating pairs — double precision phase
         foreach (var pair in profile.BeatingPairs)
         {
-            float h1Freq = baseFreq * ratios[pair.Item1];
-            float h2Freq = baseFreq * ratios[pair.Item2];
+            double h1Freq = baseFreq * ratios[pair.Item1];
+            double h2Freq = baseFreq * ratios[pair.Item2];
             for (int i = 0; i < t.Length; i++)
             {
-                float beat = MathF.Sin(SacredConstants.TWO_PI * h1Freq * t[i]) *
-                             MathF.Sin(SacredConstants.TWO_PI * h2Freq * t[i]);
+                float beat = (float)System.Math.Sin(SacredConstants.TWO_PI_D * h1Freq * t[i]) *
+                             (float)System.Math.Sin(SacredConstants.TWO_PI_D * h2Freq * t[i]);
                 result[i] += 0.05f * beat;
             }
         }
 
-        // Bowl beat modulation
+        // Bowl beat modulation — slow rate, use double
         if (profile.BowlBeat > 0)
         {
             for (int i = 0; i < t.Length; i++)
             {
                 float beatMod = 1.0f + 0.08f *
-                    MathF.Sin(SacredConstants.TWO_PI * profile.BowlBeat * t[i]);
+                    (float)System.Math.Sin(SacredConstants.TWO_PI_D * profile.BowlBeat * t[i]);
                 result[i] *= beatMod;
             }
         }

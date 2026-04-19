@@ -33,7 +33,7 @@ public sealed class ArchonDissolutionLayer : SacredLayerBase
     // PHI-scaled amplitude ensures the chief Archon (Sun) is strongest.
     #region Signal Generation
 
-    protected override float[] GenerateSignal(ReadOnlySpan<float> tChunk,
+    protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
         var simplex = Simplex.Value!;
@@ -53,28 +53,31 @@ public sealed class ArchonDissolutionLayer : SacredLayerBase
             ampScales[j] = 1.0f / (1.0f + j * 0.1f);
         }
 
-        // Sequential archon processing (memory efficient)
+        // Sequential archon processing — double precision phase for long-session stability
         var dissolution = new float[n];
         for (int j = 0; j < nArchons; j++)
         {
             float basePhase = pentPhases[j % 5];
 
-            // Phase variation from simplex
+            // Phase variation from simplex — scaled time stays small enough for float
             var tScaled = new float[n];
             for (int i = 0; i < n; i++)
-                tScaled[i] = tChunk[i] * 0.00002f * (j + 1);
+                tScaled[i] = (float)(tChunk[i] * 0.00002 * (j + 1));
             var phaseVar = simplex.GenerateNoise(tScaled, j, j, j, j);
             for (int i = 0; i < n; i++)
                 phaseVar[i] *= 0.1f;
 
-            // AEG: Acknowledge + Elevate + Ground
+            // AEG: Acknowledge + Elevate + Ground — double precision phase
+            double ackFreq = archonFreqs[j];
+            double elevFreq = elevateFreqs[j];
+            double gndFreq = groundFreqs[j];
             for (int i = 0; i < n; i++)
             {
-                float ack = MathF.Sin(SacredConstants.TWO_PI * archonFreqs[j] * tChunk[i] +
+                float ack = (float)System.Math.Sin(SacredConstants.TWO_PI_D * ackFreq * tChunk[i] +
                     basePhase + phaseVar[i]);
-                float elev = MathF.Sin(SacredConstants.TWO_PI * elevateFreqs[j] * tChunk[i] +
+                float elev = (float)System.Math.Sin(SacredConstants.TWO_PI_D * elevFreq * tChunk[i] +
                     basePhase * SacredConstants.PHI + phaseVar[i]);
-                float gnd = MathF.Sin(SacredConstants.TWO_PI * groundFreqs[j] * tChunk[i] +
+                float gnd = (float)System.Math.Sin(SacredConstants.TWO_PI_D * gndFreq * tChunk[i] +
                     phaseVar[i] * 0.5f);
                 dissolution[i] += (0.25f * ack + 0.5f * elev + 0.25f * gnd) * ampScales[j];
             }

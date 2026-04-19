@@ -17,7 +17,8 @@ public static class SacredConstants
     public const float PHI = 1.618033988749895f;             // Golden ratio (φ)
     public const float PHI_INVERSE = 1.0f / PHI;             // 1/φ = 0.618... (torus major radius)
     public const float PHI_SQ_INVERSE = 1.0f / (PHI * PHI);  // 1/φ² = 0.382... (torus minor radius)
-    public const float TWO_PI = 2.0f * MathF.PI;             // Full circle in radians
+    public const float TWO_PI = 2.0f * MathF.PI;             // Full circle in radians (float)
+    public const double TWO_PI_D = 2.0 * System.Math.PI;     // Full circle in radians (double — for precision-critical time arithmetic)
     public const float SCHUMANN = 7.83f;                     // Earth's electromagnetic heartbeat (Hz)
     public const float OGDOAD_FREQ = SCHUMANN * 8;           // 62.64 Hz — 8th sphere threshold to Pleroma
     public const float MERKABA_KEYNOTE = 432.0f;             // Lemurian tuning keynote (Hz)

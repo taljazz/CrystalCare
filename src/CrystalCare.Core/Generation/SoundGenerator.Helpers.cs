@@ -116,7 +116,7 @@ public sealed partial class SoundGenerator
     /// Only processes schedule segments that overlap with this chunk's sample range.
     /// Each active ratio contributes a sine wave at modulationIndex amplitude.
     /// </summary>
-    private static float[] ComputeModulationChunk(ReadOnlySpan<float> tChunk,
+    private static float[] ComputeModulationChunk(ReadOnlySpan<double> tChunk,
         int chunkOffset, int chunkSamples,
         List<(int start, int end, float[] ratioValues, float modIndex)> schedule)
     {
@@ -132,12 +132,12 @@ public sealed partial class SoundGenerator
             int localStart = global::System.Math.Max(0, start - chunkOffset);
             int localEnd = global::System.Math.Min(chunkSamples, end - chunkOffset);
 
-            // Sum sine waves for each ratio in this segment
+            // Sum sine waves for each ratio in this segment — double precision phase
             for (int r = 0; r < ratioValues.Length; r++)
             {
-                float ratio = ratioValues[r];
+                double ratio = ratioValues[r];
                 for (int i = localStart; i < localEnd; i++)
-                    result[i] += modIndex * MathF.Sin(SacredConstants.TWO_PI * ratio * tChunk[i]);
+                    result[i] += modIndex * (float)System.Math.Sin(SacredConstants.TWO_PI_D * ratio * tChunk[i]);
             }
         }
 
@@ -161,12 +161,12 @@ public sealed partial class SoundGenerator
     {
         // Generate a half-second test signal starting at the LFO quarter-period (peak)
         int estSamples = global::System.Math.Min(sampleRate / 2, 24000);
-        float quarterPeriod = 1.0f / (4.0f * MathF.Max(lfoParams.Lfo1Freq, 0.001f));
+        double quarterPeriod = 1.0 / (4.0 * System.Math.Max(lfoParams.Lfo1Freq, 0.001));
 
-        // Build test time array offset to the LFO peak
-        var estT = new float[estSamples];
+        // Build test time array offset to the LFO peak — double precision
+        var estT = new double[estSamples];
         for (int i = 0; i < estSamples; i++)
-            estT[i] = quarterPeriod + (float)i / sampleRate;
+            estT[i] = quarterPeriod + (double)i / sampleRate;
 
         // Generate test harmonics at full envelope with LFO modulation
         var estEnv = new float[estSamples];

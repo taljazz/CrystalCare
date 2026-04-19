@@ -6,19 +6,19 @@ namespace CrystalCare.Core.Dsp;
 /// <summary>
 /// Fractal frequency variation using Simplex noise and LFO modulation.
 /// Creates organic, ever-changing pitch micro-variations.
-/// Port of AudioProcessor.fractal_frequency_variation() from SoundGenerator.py.
+/// Time input is double precision; simplex noise receives scaled-down float values
+/// (simplex doesn't need nanosecond precision; scaling keeps values small).
 /// </summary>
 public static class FractalVariation
 {
     // Full-signal fractal variation using simplex noise with LFO modulation.
-    // Creates organic, ever-changing pitch micro-variations.
     #region Batch Computation
 
     /// <summary>
     /// Compute fractal frequency variation for a time array.
     /// Uses simplex noise with octave-like layering for rich variation.
     /// </summary>
-    public static float[] Compute(ReadOnlySpan<float> t, float baseFreq,
+    public static float[] Compute(ReadOnlySpan<double> t, float baseFreq,
         Simplex5D simplex, CancellationToken ct = default)
     {
         if (ct.IsCancellationRequested)
@@ -27,10 +27,10 @@ public static class FractalVariation
         // LFO for modulation
         var lfo = MicrotonalLfo.Generate(t, 0.01f);
 
-        // Simplex noise scaled by time
+        // Simplex noise scaled by time — cast to float after scaling (small values OK)
         var tScaled = new float[t.Length];
         for (int i = 0; i < t.Length; i++)
-            tScaled[i] = t[i] * 0.02f;
+            tScaled[i] = (float)(t[i] * 0.02);
 
         // Use baseFreq * 0.01 as y-offset to avoid degenerate seeds
         var baseNoise = simplex.GenerateNoise(tScaled, baseFreq * 0.01f);
@@ -60,12 +60,13 @@ public static class FractalVariation
     // Used by CrystallineResonanceLayer for crystal micro-variation.
     #region Streaming Chunk Computation
 
-    public static float[] ComputeChunk(ReadOnlySpan<float> tChunk, float baseFreq,
+    public static float[] ComputeChunk(ReadOnlySpan<double> tChunk, float baseFreq,
         Simplex5D simplex)
     {
+        // Simplex input scaled to small values — float is fine after scaling
         var tScaled = new float[tChunk.Length];
         for (int i = 0; i < tChunk.Length; i++)
-            tScaled[i] = tChunk[i] * 0.02f;
+            tScaled[i] = (float)(tChunk[i] * 0.02);
 
         var baseNoise = simplex.GenerateNoise(tScaled, baseFreq * 0.01f);
 
@@ -88,7 +89,6 @@ public static class FractalVariation
 
     // Dual-simplex fractal variation — the version used by the main pipeline.
     // Two independent simplex noise calls provide richer variation than single-noise.
-    // Matches the original inline pipeline logic exactly (single source of truth).
     #region Dual Simplex Computation (Pipeline)
 
     /// <summary>
@@ -96,12 +96,13 @@ public static class FractalVariation
     /// Matches the inline pipeline logic exactly — two independent noise calls
     /// for richer variation than the single-noise shifted approach.
     /// </summary>
-    public static float[] ComputeChunkDual(ReadOnlySpan<float> tChunk, float baseFreq,
+    public static float[] ComputeChunkDual(ReadOnlySpan<double> tChunk, float baseFreq,
         Simplex5D simplex)
     {
+        // Simplex input scaled to small values — float precision is sufficient
         var tScaled = new float[tChunk.Length];
         for (int i = 0; i < tChunk.Length; i++)
-            tScaled[i] = tChunk[i] * 0.02f;
+            tScaled[i] = (float)(tChunk[i] * 0.02);
 
         var baseNoise = simplex.GenerateNoise(tScaled, baseFreq * 0.01f);
         var variation2 = simplex.GenerateNoise(tScaled, baseFreq * 0.01f, 1.0f);

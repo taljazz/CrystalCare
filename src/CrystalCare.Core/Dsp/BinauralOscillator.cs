@@ -14,13 +14,14 @@ public static class BinauralOscillator
     /// <summary>
     /// Generate a single binaural pair. Returns [samples, 2] array.
     /// </summary>
-    public static float[,] Generate(ReadOnlySpan<float> t, float leftFreq, float rightFreq)
+    public static float[,] Generate(ReadOnlySpan<double> t, float leftFreq, float rightFreq)
     {
         var result = new float[t.Length, 2];
         for (int i = 0; i < t.Length; i++)
         {
-            result[i, 0] = MathF.Sin(SacredConstants.TWO_PI * leftFreq * t[i]);
-            result[i, 1] = MathF.Sin(SacredConstants.TWO_PI * rightFreq * t[i]);
+            // Double precision phase, cast sin result to float
+            result[i, 0] = (float)System.Math.Sin(SacredConstants.TWO_PI_D * leftFreq * t[i]);
+            result[i, 1] = (float)System.Math.Sin(SacredConstants.TWO_PI_D * rightFreq * t[i]);
         }
         return result;
     }
@@ -28,7 +29,7 @@ public static class BinauralOscillator
     /// <summary>
     /// Generate multiple binaural pairs. Returns array of [samples, 2] results.
     /// </summary>
-    public static float[][,] BatchGenerate(ReadOnlySpan<float> t,
+    public static float[][,] BatchGenerate(ReadOnlySpan<double> t,
         (float left, float right)[] freqPairs, CancellationToken ct = default)
     {
         var results = new float[freqPairs.Length][,];
