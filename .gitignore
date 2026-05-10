@@ -43,6 +43,10 @@ lemurian-research.txt
 lemurian-enhancements.txt
 streaming-alignment.txt
 
+# Release notes drafts (kept locally as reference; the live copy
+# lives on the GitHub release page itself once published)
+release-notes-*.md
+
 # Debug/temp files
 nul
 crystalcare_debug.log
