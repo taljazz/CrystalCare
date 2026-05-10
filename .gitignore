@@ -25,6 +25,7 @@ main.onefile-build/
 bin/
 obj/
 publish/
+publish-build/
 dist/
 *.user
 *.suo

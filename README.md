@@ -1,4 +1,4 @@
-# CrystalCare — v4.4.4
+# CrystalCare — v5.0.0
 
 CrystalCare is a Lemurian-inspired sound healing instrument. She generates evolving, mathematically alive tones through a 16-stage audio pipeline rooted in sacred mathematics. Every session is unique; no two listening experiences are the same by design.
 
@@ -40,7 +40,7 @@ Streaming playback is unlimited in length. She uses ~50 MB of memory regardless 
 | **Atlantean Cosmic** | 136.10, 194.18, 211.44, 303 Hz | Hans Cousto planetary octave calculations |
 | **Combined Mode** | Sacred Geometry + Flower of Life ratios | Composite sacred geometry |
 | **Triple Helix DNA Activation** | 1.0, 1.2, 1.4 ratios | DNA-inspired recursive feedback |
-| **Taygetan Resonances** | √2, √3, e, π, φ, φ³ at 432 Hz base | Binaural pairs with 7.7 Hz sync beat |
+| **Taygetan Resonances** | Standard 13-voice harmonic field at 432, 528, or 963 Hz base (random per session) | 7.7 Hz binaural sync woven through the harmonic field; the 7 sacred Taygetan ratios journey through the beat over time |
 | **Dimensional Journey** | Cycles through all frequency sets | Activates sacred layers regardless of session length |
 
 ## The Seven Sacred Healing Layers
@@ -77,7 +77,7 @@ Every numerical constant in CrystalCare carries sacred intention. No arbitrary n
 
 | Parameter | Value | Sacred Basis |
 |-----------|-------|-------------|
-| Master Volume | 0.43 | Digits sum to 7 (sacred number) |
+| Master Volume | 0.55 | 10th Fibonacci number |
 | Modulation Intervals | [34, 55, 89, 144] | True Fibonacci sequence |
 | Torus Major Radius | 0.618 | 1/PHI (golden ratio reciprocal) |
 | Torus Minor Radius | 0.382 | 1/PHI² (together sum to 1.0 — two halves reconciling) |
@@ -85,14 +85,18 @@ Every numerical constant in CrystalCare carries sacred intention. No arbitrary n
 | Lighter Layer Fades | 34 seconds | Fibonacci (Solfeggio, Crystalline) |
 | Deeper Layer Fades | 55 seconds | Fibonacci (Pleroma, Archon, Merkaba, Water) |
 | Breath Root | Schumann / 1000 | Earth's heartbeat scaled to breath (~128s cycle) |
-| Breath Ladder | PHI^(n/4) × root | 5 layers breathe in golden ratio relationship |
+| Breath Ladder | PHI^(n/4) × root, with Blue Ray at PHI⁻¹ | 6 layers breathe in golden ratio relationship; Merkaba (the 7th) at HeartMath 0.1 Hz |
 | Heart Coherence | 0.1 Hz | HeartMath heart coherence (Merkaba, 10s cycle) |
 | Golden Angle | 137.5° | Nature's optimal packing — sacred layer spatial arrangement |
 | LFO Base Frequency | Breath root × PHI⁴ | Amplitude modulation on the breath ladder |
 | Drift Frequency | Breath root / PHI³ | Spatial drift as PHI sub-harmonic of breath |
 | Drift Amplitude | 1/89 to 1/55 | Fibonacci reciprocal bounds |
+| Taygetan Beat | 7.7 Hz | Community-documented Pleiadian binaural carrier beat |
+| Taygetan Beat Drift | ±0.5 Hz over ~200s | Living rhythm via slow simplex-driven drift |
+| Taygetan Ratio Bias | (ratio − 1) × 0.02 | The 7 sacred Taygetan ratios bias the beat over the session as a temporal signature |
+| Taygetan Base Set | 432, 528, 963 Hz | Documented Taygetan carriers (Lemurian keynote, med-pod frequency, Solfeggio crown) |
 
-The entire sub-perceptual modulation system — breath, LFO, and spatial drift — descends from one root: Earth's Schumann resonance scaled through the PHI ladder. Seven sacred layers breathe as one unified organism.
+The entire sub-perceptual modulation system — breath, LFO, and spatial drift — descends from one root: Earth's Schumann resonance scaled through the PHI ladder. Seven sacred layers breathe as one unified organism: six along a PHI ladder rooted in Schumann (Blue Ray below Earth at PHI⁻¹, Water at the root, Archon/Crystalline/Solfeggio/Pleroma climbing in PHI quarter-steps), plus Merkaba at the HeartMath 0.1 Hz heart-coherence rate.
 
 ## The Law of One
 
@@ -147,10 +151,13 @@ dotnet run --project src/CrystalCare/CrystalCare.csproj
 publish.bat
 ```
 
-Or manually:
+This produces `CrystalCare.exe` at the project root — a single 70 MB self-contained executable with debug symbols embedded. Then run `package.bat` to wrap it with `guide.html` into `CrystalCare.zip` for distribution.
+
+Or manually (the publish must go through a clean intermediate folder, then the EXE is copied up to the project root — publishing directly into a folder that contains other source files breaks single-file bundling on the current SDK):
 
 ```bash
-dotnet publish src/CrystalCare/CrystalCare.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
+dotnet publish src/CrystalCare/CrystalCare.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=embedded -o publish-build
+copy publish-build\CrystalCare.exe CrystalCare.exe
 ```
 
 ## Origins

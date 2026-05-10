@@ -1,9 +1,17 @@
 ﻿<Application x:Class="CrystalCare.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:CrystalCare"
-             StartupUri="MainWindow.xaml">
+             xmlns:local="clr-namespace:CrystalCare">
+    <!--
+        StartupUri removed intentionally — we instantiate MainWindow in
+        App.xaml.cs OnStartup instead. The XAML-based StartupUri lookup
+        fails inside a single-file self-contained EXE built with
+        EnableCompressionInSingleFile=true: WPF asks for "mainwindow.xaml"
+        (lowercased) while the embedded resource is "MainWindow.xaml"
+        (proper case), throwing System.IO.IOException at app launch.
+        Manual instantiation bypasses that broken lookup path entirely.
+    -->
     <Application.Resources>
-         
+
     </Application.Resources>
 </Application>
