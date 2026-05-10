@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using CrystalCare.Audio;
+using CrystalCare.Core.Diagnostics;
 using CrystalCare.Core.Frequencies;
 using CrystalCare.Core.Generation;
 using Microsoft.Win32;
@@ -81,6 +82,12 @@ public partial class MainWindow : Window, IMMNotificationClient
         // Create the sound player that wraps NAudio for playback and saving
         _soundPlayer = new SoundPlayer(_soundGenerator);
 
+        // Enable diagnostic logging by default — user explicitly requested this
+        // for diagnosing Taygetan-mode dissonance. Each Play/Save creates a
+        // timestamped log in %TEMP%/CrystalCare-diag-*.log. Set to false here
+        // (or via property) once the diagnosis is complete.
+        DiagnosticLogger.IsEnabled = true;
+
         // Populate the output device dropdown with all available audio devices
         PopulateDeviceList();
 
@@ -111,6 +118,15 @@ public partial class MainWindow : Window, IMMNotificationClient
         // Cast the ComboBox index directly to FrequencyMode enum (values match 0-6)
         var mode = (FrequencyMode)FreqChoice.SelectedIndex;
         float baseFreq = DeriveBaseFreq(mode);
+
+        // Initialize the diagnostic logger BEFORE starting the audio pipeline so
+        // the very first log call inside GenerateStream has a file to write to.
+        // Path is surfaced in the status bar so the user can find it after the
+        // session ends. Logging is opt-in via DiagnosticLogger.IsEnabled (set
+        // elsewhere in this file's constructor or via UI).
+        string diagPath = DiagnosticLogger.Initialize($"{mode}-Play");
+        if (!string.IsNullOrEmpty(diagPath))
+            UpdateStatus($"Diagnostic log: {diagPath}");
 
         _cts = new CancellationTokenSource();
         ToggleControls(isPlaying: true);
@@ -185,6 +201,12 @@ public partial class MainWindow : Window, IMMNotificationClient
 
         string filename = dialog.FileName;
         float baseFreq = DeriveBaseFreq(mode);
+
+        // Initialize the diagnostic logger before starting the batch generation so
+        // dissonance and pipeline stats get captured into a per-session log file.
+        string diagPath = DiagnosticLogger.Initialize($"{mode}-Save");
+        if (!string.IsNullOrEmpty(diagPath))
+            UpdateStatus($"Diagnostic log: {diagPath}");
 
         _cts = new CancellationTokenSource();
         ToggleControls(isPlaying: true, showGauge: true);
@@ -294,6 +316,13 @@ public partial class MainWindow : Window, IMMNotificationClient
             return;
         }
         string saveDir = folderDialog.SelectedPath;
+
+        // Initialize a single log for the whole batch — all tones append to it.
+        // This lets us see per-tone variation in one file (each tone restarts the
+        // pre-loop diagnostic header, so seams between tones are easy to spot).
+        string diagPath = DiagnosticLogger.Initialize($"{mode}-Batch");
+        if (!string.IsNullOrEmpty(diagPath))
+            UpdateStatus($"Diagnostic log: {diagPath}");
 
         _cts = new CancellationTokenSource();
         ToggleControls(isPlaying: true, showGauge: true);
@@ -455,16 +484,37 @@ public partial class MainWindow : Window, IMMNotificationClient
     /// <summary>
     /// Derive the base frequency for a given mode.
     /// Modes 0-2: randomly pick from the mode's frequency list.
-    /// Modes 3-5: use 432 Hz (sacred geometry ratios multiply the base).
+    /// Modes 3-4: use 432 Hz (sacred geometry ratios multiply the base).
+    /// Mode 5 (Taygetan): randomly pick from TAYGETAN_BASE_FREQS [432, 528, 963]
+    ///                    so each Taygetan session opens at a different
+    ///                    well-documented healing carrier — varies her up while
+    ///                    keeping every choice within Taygetan-validated tradition.
     /// Mode 6 (Dimensional): always 432 Hz.
     /// </summary>
     private float DeriveBaseFreq(FrequencyMode mode)
     {
+        // Dimensional Shift uses 432 because all sacred geometry ratios multiply
+        // this base; the journey is anchored to the Lemurian keynote.
         if (mode == FrequencyMode.DimensionalShift) return 432f;
+
+        // Taygetan picks randomly from a researched set of bases — mirrors
+        // Modes 0, 1, 2 which all randomly pick from their own frequency lists.
+        // 432 Hz (Lemurian keynote / canonical Taygetan binaural carrier),
+        // 528 Hz (Solfeggio Love / Taygetan med-pod frequency), 963 Hz
+        // (Solfeggio crown / ascension). Each session opens at a different
+        // sacred base so the listener never knows which she'll receive.
+        if (mode == FrequencyMode.TaygetanBinaural)
+        {
+            var bases = SacredConstants.TAYGETAN_BASE_FREQS;
+            return bases[Random.Shared.Next(bases.Length)];
+        }
 
         var result = _frequencyManager.GetFrequencies(mode);
 
-        // Binaural modes return frequency pairs — use the left ear frequency
+        // Binaural modes return frequency pairs — use the left ear frequency.
+        // (No mode currently reaches this branch — Taygetan is handled above —
+        // but keep the path live for any future binaural mode that doesn't
+        // need a fixed anchor.)
         if (result.IsBinaural && result.BinauralPairs!.Length > 0)
         {
             var pair = result.BinauralPairs[Random.Shared.Next(result.BinauralPairs.Length)];

@@ -3,7 +3,7 @@ using CrystalCare.Core.Frequencies;
 namespace CrystalCare.Core.Dsp;
 
 /// <summary>
-/// Vectorized harmonic generation with cross-modulation.
+/// Vectorized harmonic generation with cross-modulation and optional organic phase drift.
 /// Time input is double precision to preserve phase accuracy over long sessions.
 /// </summary>
 public static class HarmonicGenerator
@@ -11,14 +11,48 @@ public static class HarmonicGenerator
     // The hot inner loop — generates harmonics for all 13 frequencies with
     // envelope, LFO, cross-modulation, and per-harmonic amplitude scaling.
     // Cross-modulation at freq × PHI_INVERSE creates golden-ratio harmonic relationships.
+    // Optional sub-perceptual phase modulation wires Stage 2 fractal variation
+    // into every carrier — the macro-evolution channel that was previously
+    // disconnected from the audio path.
     #region Harmonic Generation
 
+    /// <summary>
+    /// Generate the summed-harmonics waveform for a chunk.
+    /// </summary>
+    /// <param name="phaseModulation">
+    /// Optional per-sample phase offset signal (typically the fractal variation array).
+    /// When non-empty AND <paramref name="phaseModulationScale"/> is non-zero, adds
+    /// sub-perceptual organic drift to every carrier — wiring the simplex pitch
+    /// evolution into the audio path. Defaults to empty (legacy behavior preserved).
+    /// </param>
+    /// <param name="phaseModulationScale">
+    /// Multiplier applied to <paramref name="phaseModulation"/> before adding to phase.
+    /// 0 disables the feature. ~0.0005 is sub-perceptual; ~0.005 is noticeable drift.
+    /// </param>
+    /// <param name="ampScales">
+    /// Optional per-frequency amplitude multipliers. When non-empty, each harmonic's
+    /// natural decay scale (0.015/(f+1)) is multiplied by ampScales[f]. Used by
+    /// Taygetan mode to weight the 7 sacred ratios according to the PHI-timed
+    /// schedule (one ratio emphasized per window, others ride at baseline). When
+    /// empty, every frequency runs at its natural decay scale (legacy behavior).
+    /// </param>
     public static float[] GenerateHarmonics(ReadOnlySpan<double> t, float[] frequencies,
-        ReadOnlySpan<float> envelope, ReadOnlySpan<float> lfo, float[] modDepths)
+        ReadOnlySpan<float> envelope, ReadOnlySpan<float> lfo, float[] modDepths,
+        ReadOnlySpan<float> phaseModulation = default, float phaseModulationScale = 0f,
+        ReadOnlySpan<float> ampScales = default)
     {
         int nSamples = t.Length;
         int nFreqs = frequencies.Length;
         var result = new float[nSamples];
+
+        // Decide whether the optional organic phase modulation is active.
+        // When the scale is zero or no modulation array was supplied, this method
+        // behaves identically to the legacy harmonic generator (feature off).
+        bool usePhaseModulation = phaseModulationScale != 0f && !phaseModulation.IsEmpty;
+
+        // Decide whether per-frequency amp scaling is active. When empty, every
+        // harmonic uses its natural decay scale (0.015/(f+1)) — legacy behavior.
+        bool useAmpScales = !ampScales.IsEmpty;
 
         for (int f = 0; f < nFreqs; f++)
         {
@@ -26,13 +60,29 @@ public static class HarmonicGenerator
             double freq = frequencies[f];
             double modFreq = freq * SacredConstants.PHI_INVERSE; // 1/φ cross-modulation
             float modDepth = modDepths[f];
+            // Natural harmonic decay — first frequency loudest, decreasing 1/(f+1).
+            // Mirrors the standard pipeline's tone-formation curve; for Taygetan,
+            // ampScales[f] further weights this by the schedule-driven prominence.
             float scale = 0.015f / (f + 1);
+            if (useAmpScales) scale *= ampScales[f];
 
             for (int i = 0; i < nSamples; i++)
             {
-                // Compute phase in double, call Sin in double, cast result to float
+                // Cross-modulation signal — PHI_INVERSE harmonic relationship in radians.
+                // Each carrier has its own modSignal (depends on freq), creating
+                // per-frequency variation in the timbral fingerprint.
                 float modSignal = (float)System.Math.Sin(SacredConstants.TWO_PI_D * modFreq * t[i]) * modDepth;
-                float wave = (float)System.Math.Sin(SacredConstants.TWO_PI_D * freq * t[i] + modSignal);
+
+                // Compose the full phase. Base term + cross-mod + optional organic drift.
+                // The phase modulation term (when active) is the SAME for all carriers
+                // at sample i, so all 13 harmonics drift together as one slowly-evolving
+                // bank — like the breath of the entire harmonic field.
+                double phase = SacredConstants.TWO_PI_D * freq * t[i] + modSignal;
+                if (usePhaseModulation)
+                    phase += phaseModulationScale * phaseModulation[i];
+
+                // Compute sine in double, cast back to float for the audio sample
+                float wave = (float)System.Math.Sin(phase);
                 result[i] += wave * envelope[i] * scale * lfo[i];
             }
         }

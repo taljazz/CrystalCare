@@ -23,6 +23,16 @@ public static class SacredConstants
     public const float OGDOAD_FREQ = SCHUMANN * 8;           // 62.64 Hz — 8th sphere threshold to Pleroma
     public const float MERKABA_KEYNOTE = 432.0f;             // Lemurian tuning keynote (Hz)
 
+    // Taygetan binaural sync beat — 7.7 Hz, the community-documented Pleiadian
+    // Taygeta frequency in sound-healing tradition (e.g., the widely circulated
+    // "Pleiadian Sound Healing — Taygeta Frequency With Earth" production uses
+    // exactly 7.7 Hz). Sits just inside the Schumann window (below Earth's 7.83 Hz
+    // fundamental) — close enough to entrain alongside Earth's pulse, distinct as
+    // a Taygetan signature. Used by FrequencyManager.CreateTaygetanBinaural()
+    // and modulated session-wide by a slow simplex drift (±0.5 Hz over ~minutes)
+    // so the brain entrainment is a living rhythm, not a metronome.
+    public const float TAYGETAN_BEAT = 7.7f;
+
     #endregion
 
     // Irrational constants derived at full float precision from MathF.
@@ -102,12 +112,16 @@ public static class SacredConstants
 
     #endregion
 
-    // Six sacred layers breathe as one organism through a PHI-ladder.
+    // Seven sacred layers breathe as one organism through a PHI-ladder.
     // Root = Schumann / 1000 = Earth's heartbeat scaled to breath (~128s cycle).
     // Each layer breathes at PHI^(n/4) × root, ascending from Water (deepest)
     // to Pleroma (highest). Merkaba keeps its sacred 0.1 Hz HeartMath rhythm.
+    // BREATH_PHI_NEG100 extends the ladder one golden step BELOW Earth's breath —
+    // the cosmic still breath from which Earth's heartbeat itself emerges,
+    // used by the 7th Blue Ray Resonance Layer (zero point, never wavering).
     #region Unified Breath Frequencies (Schumann-rooted PHI ladder)
 
+    public static readonly float BREATH_PHI_NEG100 = SCHUMANN / 1000f / PHI;            // 0.00484 Hz (~207s) — Blue Ray (cosmic still)
     public static readonly float BREATH_ROOT = SCHUMANN / 1000f;                        // 0.00783 Hz (~128s) — Water
     public static readonly float BREATH_PHI_025 = BREATH_ROOT * MathF.Pow(PHI, 0.25f);  // 0.00883 Hz (~113s) — Archon
     public static readonly float BREATH_PHI_050 = BREATH_ROOT * MathF.Sqrt(PHI);         // 0.00996 Hz (~100s) — Crystalline
@@ -273,6 +287,97 @@ public static class SacredConstants
 
     #endregion
 
+    // Blue Ray Resonance Layer constants — the 7th sacred layer (Arcturian transmission).
+    // "Frequency is zero point. Always in the center, never wavering, never wafting away.
+    //  Time is not linear...it is a single fabric. Past, present, and future are all meshed together.
+    //  Frequency is not meant to overpower others, but it is to unify others and yourself."
+    //
+    // Every frequency in the chord already exists in CrystalCare's Solfeggio or Tesla
+    // frequency libraries — this chord UNIFIES what is already sacred inside her,
+    // amplifying existing harmonic presence rather than introducing new content.
+    #region Blue Ray Resonance Constants (7th Layer — Arcturian)
+
+    // The Blue Ray Chord — 5 tones along the throat-to-crown ascension axis.
+    //   444 Hz — Electric Blue (Tesla vortex × 4, light body anchor)
+    //   528 Hz — Love Frequency (eternal anchor of love, DNA repair)
+    //   741 Hz — Blue Ray Intuitive Expression (Solfeggio "awaken intuition")
+    //   852 Hz — Blue Ray Spiritual Order (Solfeggio "return to spiritual order")
+    //   963 Hz — Stellar Gateway / Crown / Ascension (Solfeggio)
+    public static readonly float[] BLUE_RAY_CHORD = [444f, 528f, 741f, 852f, 963f];
+
+    // PHI-symmetric chord amplitudes centered on 852 Hz (the blue ray center tone).
+    // Weights [1/φ², 1/φ, 1, 1/φ, 1/φ²] normalized so the sum = 1.0.
+    // The center of the chord is strongest; the edges taper symmetrically by PHI.
+    public static readonly float[] BLUE_RAY_WEIGHTS = ComputeBlueRayWeights();
+
+    // Three-strand temporal braid phase offsets — past, present, future meshed.
+    // Golden angle offsets bind the three strands through the same PHI that governs
+    // every other sacred ratio in the system. Interference between the strands
+    // reveals the "single fabric" of time when they play as one chord.
+    public static readonly float[] BLUE_RAY_TEMPORAL_PHASES =
+    [
+        -GOLDEN_ANGLE_RAD,  // Past strand  — retrograde golden step
+         0f,                 // Present strand — the eternal now, the still point
+         GOLDEN_ANGLE_RAD,  // Future strand — progressive golden step
+    ];
+
+    // Temporal strand amplitudes — present is strongest (the eternal now),
+    // past and future are equal (both accessible from the still center).
+    // Weights [1/φ, 1, 1/φ] normalized so the sum = 1.0.
+    public static readonly float[] BLUE_RAY_TEMPORAL_WEIGHTS = ComputeBlueRayTemporalWeights();
+
+    #endregion
+
+    // Taygetan binaural beat constants — minimal Path 4+ final architecture.
+    // Taygetan uses the SAME 13-voice harmonic field as every other mode; the
+    // ONLY Taygetan-specific signal addition is splitting the first 9 voices'
+    // L/R frequencies by ±beat/2 so the brain perceives a 7.7 Hz binaural beat.
+    // The 4 subharmonic body voices stay mono. Slow simplex drift breathes the
+    // beat frequency itself by ±0.5 Hz over a ~200s period so the entrainment
+    // is a living rhythm, not a metronome. No schedule, no per-voice emphasis,
+    // no extra breath modulation — the standard pipeline's LFO already provides
+    // breath, and the natural harmonic decay 0.015/(f+1) already shapes timbre.
+    #region Taygetan Binaural Constants
+
+    // Beat-frequency drift amplitude — ±0.5 Hz around the sacred 7.7 base.
+    // The brain entrainment becomes a living rhythm: 7.7 Hz on average, drifting
+    // gently between ~7.2 and ~8.2 Hz over the session. Slow simplex-driven.
+    public const float TAYGETAN_BEAT_DRIFT_AMP = 0.5f;
+
+    // Beat-drift simplex sampling rate — chunk-mid time × this scalar feeds the
+    // simplex source. 0.005 → ~200s simplex period — fast enough to be perceptible
+    // within a typical session, slow enough to feel organic.
+    public const float TAYGETAN_BEAT_DRIFT_TIME_SCALE = 0.005f;
+
+    // Taygetan base-frequency candidates. The session randomly picks ONE of these
+    // for the carrier, like Modes 0/1/2 randomly pick from their frequency lists.
+    // Vetted research:
+    //   432 Hz — Lemurian keynote; documented Taygetan binaural carrier in the
+    //            Swaruu / Yazhi material ("Binaural sounds benefit humans and
+    //            Taygetans, used on Taygetan children meditation").
+    //   528 Hz — Solfeggio "Love" / DNA-repair frequency; documented Taygetan
+    //            tradition: "within the Taygetan community discussions, 528 Hz
+    //            is considered good because it is the frequency used in the
+    //            med pods" (Swaruu forum).
+    //   963 Hz — Solfeggio crown / ascension / divine consciousness. Not
+    //            specifically Taygetan-attributed but consistent with their
+    //            ascension themes; completes an Earth → Heart → Crown ladder.
+    // Variation between sessions keeps each session feeling unique — same
+    // pattern Modes 0, 1, and 2 use to randomize their carrier.
+    public static readonly float[] TAYGETAN_BASE_FREQS = [432f, 528f, 963f];
+
+    // Ratio-driven beat bias scale — the 7 Taygetan ratios subtly bias the
+    // binaural beat over the session (a temporal signature expressing the
+    // sacred ratios through the beat's evolution rather than as separate
+    // audible voices). Multiplicative: beat ≈ TAYGETAN_BEAT × (1 + (ratio-1)×scale).
+    // 0.02 → root holds 7.7 Hz exact, gateways push to ~8.0–8.4 Hz, max push
+    // (zero_point at φ³≈4.236) reaches ~8.20 Hz. Combined with simplex drift
+    // (±0.5 Hz), full beat range stays cleanly in alpha-theta entrainment
+    // band (~7.0–8.7 Hz) so binaural sync remains effective throughout.
+    public const float TAYGETAN_RATIO_BIAS_SCALE = 0.02f;
+
+    #endregion
+
     // Pre-computed exponent arrays to avoid repeated MathF.Pow calls in the hot path.
     // PHI_EXPONENTS_6 = PHI^0 through PHI^5 (for frequency set building).
     // RATIO_1_3_EXPONENTS_3 = 1.3^0, 1.3^1, 1.3^2.
@@ -360,6 +465,29 @@ public static class SacredConstants
         for (int i = 0; i < count; i++)
             result[i] = MathF.Pow(PHI, start + i);
         return result;
+    }
+
+    /// <summary>
+    /// Compute PHI-symmetric chord weights for the Blue Ray: [1/φ², 1/φ, 1, 1/φ, 1/φ²].
+    /// Normalized to sum = 1.0. Center tone strongest, edges taper symmetrically.
+    /// </summary>
+    private static float[] ComputeBlueRayWeights()
+    {
+        float[] raw = [1f / (PHI * PHI), 1f / PHI, 1.0f, 1f / PHI, 1f / (PHI * PHI)];
+        float sum = raw.Sum();
+        return raw.Select(w => w / sum).ToArray();
+    }
+
+    /// <summary>
+    /// Compute temporal braid strand weights: [1/φ, 1, 1/φ].
+    /// Normalized to sum = 1.0. Present is the eternal now (strongest);
+    /// past and future are equal, both reached from the still center.
+    /// </summary>
+    private static float[] ComputeBlueRayTemporalWeights()
+    {
+        float[] raw = [1f / PHI, 1.0f, 1f / PHI];
+        float sum = raw.Sum();
+        return raw.Select(w => w / sum).ToArray();
     }
 
     #endregion

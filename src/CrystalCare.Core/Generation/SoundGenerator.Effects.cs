@@ -65,12 +65,24 @@ public sealed partial class SoundGenerator
     /// Apply toroidal panning with Rössler chaos and simplex perturbation.
     /// Uses pooled buffers for panCurve, tScaled1, and tScaled2 to avoid allocation.
     /// </summary>
+    /// <param name="torusDriftTheta">
+    /// Optional slow phase offset added to theta each sample (per-chunk constant).
+    /// Typically a sub-perceptual simplex sample × TorusDriftScale that evolves
+    /// across chunks, giving the spatial path a slow background pulse beneath
+    /// the existing fast simplex perturbation and Rössler chaos. 0 = legacy.
+    /// </param>
+    /// <param name="torusDriftPhi">
+    /// Optional slow phase offset added to phi each sample (per-chunk constant).
+    /// Typically <paramref name="torusDriftTheta"/> × PHI to preserve the golden
+    /// ratio between theta and phi rotation rates as both drift together.
+    /// </param>
     private static void ApplyToroidalPanning(float[] waveLeft, float[] waveRight,
         ReadOnlySpan<double> tChunk, int chunkSamples,
         float thetaFreq, float phiFreq, float R, float r,
         Simplex5D simplexPan, Math.RosslerAttractor.Trajectory rossler,
         ExponentialSmoother panSmoother, float driftFreq, float driftAmp,
-        ChunkBufferPool pool)
+        ChunkBufferPool pool,
+        double torusDriftTheta = 0.0, double torusDriftPhi = 0.0)
     {
         // Use pooled buffers instead of allocating new arrays each chunk
         var panCurve = pool.PanCurve;
@@ -103,9 +115,12 @@ public sealed partial class SoundGenerator
             tp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.X, rossler.T, (float)time);
             pp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.Y, rossler.T, (float)time);
 
-            // Compute torus position in double: theta (horizontal) and phi (depth)
-            double theta = SacredConstants.TWO_PI_D * thetaFreq * time + tp;
-            double phi = SacredConstants.TWO_PI_D * phiFreq * time + pp;
+            // Compute torus position in double: theta (horizontal) and phi (depth).
+            // Optional slow drift offsets (per-chunk constants) shift the rotation's
+            // phase position; phi drift is PHI-scaled by the caller so the golden
+            // ratio between theta and phi rotation rates is preserved as they evolve.
+            double theta = SacredConstants.TWO_PI_D * thetaFreq * time + tp + torusDriftTheta;
+            double phi = SacredConstants.TWO_PI_D * phiFreq * time + pp + torusDriftPhi;
 
             // Map torus position to mono pan value: x-projection of torus surface point
             panCurve[i] = (float)((R + r * System.Math.Cos(phi)) * System.Math.Cos(theta) / (R + r));

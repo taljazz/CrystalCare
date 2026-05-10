@@ -8,15 +8,32 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public static class EvolvingNoiseLayer
 {
+    // Generates Gaussian noise modulated by a slow low-frequency oscillation.
+    // The Box-Muller transform produces unit-Gaussian samples; the slow oscillation
+    // (BREATH_ROOT to BREATH_PHI_100, ~0.008-0.013 Hz) breathes the noise level.
+    // Optional pre-drawn frequency parameter prevents the slow envelope from
+    // discontinuously jumping at every chunk boundary when called from a streaming
+    // pipeline — letting the noise floor evolve smoothly across the entire session.
+    #region Noise Generation
+
     /// <summary>
     /// Generate an evolving noise layer with low-frequency oscillation modulation.
     /// Noise level = BREATH_ROOT × PHI_SQ_INVERSE (sacred root derivative).
     /// Oscillation amplitude = 1/55 (Fibonacci reciprocal).
     /// Frequency range spans the breath ladder: BREATH_ROOT to BREATH_PHI_100.
     /// </summary>
+    /// <param name="frequency">
+    /// Optional pre-drawn oscillation frequency (Hz). When 0 (default), the function
+    /// draws a fresh random frequency in the breath-ladder range each call — this is
+    /// the legacy behavior, but in streaming pipelines it creates a discontinuity in
+    /// the slow envelope at every chunk boundary. Pass a single session-level value
+    /// (drawn once before the chunk loop) to fix the discontinuity and let the noise
+    /// floor breathe smoothly across the whole session.
+    /// </param>
     public static float[] Generate(ReadOnlySpan<double> t,
         float noiseLevel = 0f, // 0 = use sacred default
-        Random? rng = null)
+        Random? rng = null,
+        float frequency = 0f)
     {
         rng ??= Random.Shared;
 
@@ -26,9 +43,13 @@ public static class EvolvingNoiseLayer
 
         var result = new float[t.Length];
 
-        // Frequency range spans the breath ladder: BREATH_ROOT (~0.00783) to BREATH_PHI_100 (~0.01267)
+        // Resolve the oscillation frequency. If the caller supplied a non-zero value,
+        // use it (smooth session-wide envelope); otherwise fall back to legacy
+        // behavior of drawing a fresh frequency in the breath-ladder range each call.
         double freqRange = SacredConstants.BREATH_PHI_100 - SacredConstants.BREATH_ROOT;
-        double freq = SacredConstants.BREATH_ROOT + rng.NextDouble() * freqRange;
+        double freq = frequency > 0f
+            ? frequency
+            : SacredConstants.BREATH_ROOT + rng.NextDouble() * freqRange;
 
         for (int i = 0; i < t.Length; i++)
         {
@@ -48,4 +69,6 @@ public static class EvolvingNoiseLayer
 
         return result;
     }
+
+    #endregion
 }

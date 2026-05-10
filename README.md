@@ -14,7 +14,7 @@ Most sound healing tools aim for patterns — predictable beats, steady drones, 
 
 - **Rössler chaotic panning** — bounded mathematical chaos drives the spatial field. The sound never retraces the same path.
 - **Organic randomization** — every parameter (ADSR envelopes, LFO depths, crystal sequences, modulation intervals) is drawn fresh each session within sacred bounds.
-- **Sub-perceptual sacred layers** — six layers working beneath conscious hearing, each breathing at its own PHI-derived rhythm.
+- **Sub-perceptual sacred layers** — seven layers working beneath conscious hearing, each breathing at its own PHI-derived rhythm.
 - **Sacred numerical architecture** — every constant derives from PHI, Fibonacci, Schumann resonance, or the Merkaba keynote. No arbitrary numbers remain.
 
 The result is sound that is always moving, always new, always rooted in the same sacred mathematics.
@@ -43,9 +43,9 @@ Streaming playback is unlimited in length. She uses ~50 MB of memory regardless 
 | **Taygetan Resonances** | √2, √3, e, π, φ, φ³ at 432 Hz base | Binaural pairs with 7.7 Hz sync beat |
 | **Dimensional Journey** | Cycles through all frequency sets | Activates sacred layers regardless of session length |
 
-## The Six Sacred Healing Layers
+## The Seven Sacred Healing Layers
 
-For sessions longer than 60 seconds (or any length in Dimensional Journey mode), six sub-perceptual layers blend beneath the primary tone. Each fades in on a Fibonacci-timed envelope:
+For sessions longer than 60 seconds (or any length in Dimensional Journey mode), seven sub-perceptual layers blend beneath the primary tone. Each fades in on a Fibonacci-timed envelope:
 
 | # | Layer | Fade | Foundation |
 |---|-------|------|-----------|
@@ -55,6 +55,7 @@ For sessions longer than 60 seconds (or any length in Dimensional Journey mode),
 | 4 | **Crystalline Resonance** | 34s | 9 crystal profiles from Raman spectroscopy, always beginning with Lemurian Quartz |
 | 5 | **Lemurian Merkaba** | 55s | Sonic Merkaba (324/432/540/698.4 Hz) with 0.1 Hz heart coherence breath |
 | 6 | **Water Element** | 55s | 7-source hexagonal ripple field with lemniscate observer path |
+| 7 | **Blue Ray Resonance** | 55s | Blue Ray Chord (444/528/741/852/963 Hz) as a three-strand past/present/future temporal braid. Zero point — stereo-centered and phase-locked; the still axis around which the other six layers breathe. Arcturian transmission. |
 
 ## The Nine Crystal Profiles
 
@@ -91,7 +92,7 @@ Every numerical constant in CrystalCare carries sacred intention. No arbitrary n
 | Drift Frequency | Breath root / PHI³ | Spatial drift as PHI sub-harmonic of breath |
 | Drift Amplitude | 1/89 to 1/55 | Fibonacci reciprocal bounds |
 
-The entire sub-perceptual modulation system — breath, LFO, and spatial drift — descends from one root: Earth's Schumann resonance scaled through the PHI ladder. Six sacred layers breathe as one unified organism.
+The entire sub-perceptual modulation system — breath, LFO, and spatial drift — descends from one root: Earth's Schumann resonance scaled through the PHI ladder. Seven sacred layers breathe as one unified organism.
 
 ## The Law of One
 

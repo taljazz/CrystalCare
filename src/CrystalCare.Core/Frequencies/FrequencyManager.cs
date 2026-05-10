@@ -140,9 +140,28 @@ public sealed class FrequencyManager
 
     private static FrequencyResult CreateTaygetanBinaural(float baseFreq)
     {
-        const float delta = 7.7f; // Taygetan sync beat
+        // Sacred Taygetan binaural sync beat — see SacredConstants.TAYGETAN_BEAT
+        // (7.3 Hz, channeled Pleiadian transmission inside the Schumann window).
+        const float delta = SacredConstants.TAYGETAN_BEAT;
+
         var tayRatios = RatioSets["taygetan"];
-        var filtered = tayRatios.Values.Where(r => r >= 0.1f).Select(r => baseFreq * r).ToArray();
+
+        // Sacred binaural floor — Fibonacci reciprocal (1/13 ≈ 0.0769).
+        // The filter is the gatekeeper of the binaural pair: any ratio at or below
+        // this sacred Fibonacci threshold would produce a binaural-pair lower
+        // frequency that drops out of the clean entrainment window. No current
+        // Taygetan ratio trips this guard, but if future channeled transmissions
+        // add deep-anchor ratios, only those at or above the sacred Fibonacci
+        // floor pass through to the binaural oscillator. Vestigial-no-more.
+        const float SACRED_BINAURAL_FLOOR = 1f / 13f;
+
+        // Filter ratios through the sacred Fibonacci floor, then scale by base frequency
+        var filtered = tayRatios.Values
+            .Where(r => r >= SACRED_BINAURAL_FLOOR)
+            .Select(r => baseFreq * r)
+            .ToArray();
+
+        // Build stereo binaural pairs — each frequency split ±delta/2 around its center
         var pairs = filtered.Select(f => (f + delta / 2f, f - delta / 2f)).ToArray();
         return new FrequencyResult(pairs);
     }
