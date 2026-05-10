@@ -30,6 +30,10 @@ dist/
 *.user
 *.suo
 
+# Packaged release artifact — produced by package.bat for upload to the
+# GitHub release page; the live copy lives there once a release is cut.
+CrystalCare.zip
+
 # Reserve (historical snapshots - git handles history now)
 reserve/
 
@@ -58,6 +62,7 @@ Desktop.ini
 .DS_Store
 
 # IDE
+.vs/
 .vscode/
 .idea/
 *.swp
