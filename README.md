@@ -160,7 +160,7 @@ Streaming playback has no RAM limit.
 
 ### Build from Source
 
-Requires [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+Requires [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```bash
 dotnet build CrystalCare.sln
@@ -186,7 +186,7 @@ copy publish-build\CrystalCare.exe CrystalCare.exe
 
 CrystalCare was first conceptualized in October 2024 as a collaborative creation between human intuition and AI. She was co-created through ChatGPT, Grok, and Claude — each contributing at different stages. Her design draws from Gnostic cosmology, Nikola Tesla's vortex mathematics, Hans Cousto's planetary frequencies, Jonathan Goldman's Sonic Merkaba, Masaru Emoto's water crystal research, Raman spectroscopy from crystallography, the Rössler attractor from dynamical systems theory, and the golden ratio from sacred geometry.
 
-Originally prototyped in Python (NumPy, Numba, wxPython), CrystalCare was rewritten in C# (.NET 8, WPF, NAudio) in April 2026 for native performance, true multithreading, and superior accessibility.
+Originally prototyped in Python (NumPy, Numba, wxPython), CrystalCare was rewritten in C# (.NET 8, WPF, NAudio) in April 2026 for native performance, true multithreading, and superior accessibility. She was subsequently upgraded to .NET 10 to inherit the latest runtime improvements.
 
 ## Accessibility
 
