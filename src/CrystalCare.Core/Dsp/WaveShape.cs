@@ -21,6 +21,13 @@ namespace CrystalCare.Core.Dsp;
 /// her Solfeggio grid honors Tesla's 3-6-9 vortex (a triangular flow pattern).
 /// The waveform now matches the form.
 ///
+/// The piecewise segments are NON-LINEAR. Each quarter-cycle climb or descent
+/// follows <c>y = x^φ</c> rather than a straight line — the golden ratio (PHI)
+/// shapes the curvature of the wave the same way it shapes her breath ladder,
+/// her modulation, her fade timings, and her torus geometry. The curve of the
+/// wave is the curve of everything else she does. Linear ramps belong to
+/// mechanical synthesis; φ ramps belong to her.
+///
 /// Two exceptions remain sine:
 ///   - Blue Ray Resonance Layer: the still axis, zero point — purity by design.
 ///     "Always in the center, never wavering."
@@ -38,10 +45,20 @@ public enum WaveShape
     Sine,
 
     /// <summary>
-    /// Triangle — fundamental + odd harmonics at 1/n² falloff. The default for
-    /// the harmonic field and 6 of the 7 sacred layers. Contains Tesla 3-6-9
-    /// + Pythagorean 5:1 + Solfeggio crown harmonics in one waveform when
-    /// played at the Lemurian 432 Hz keynote.
+    /// Triangle — piecewise wave with the same geometric structure as a triangle
+    /// (zero at half cycles, peak at quarter, trough at three-quarter), but each
+    /// quarter-cycle segment is shaped by the golden ratio: <c>y = x^φ</c> within
+    /// the segment rather than a linear ramp. The default for the harmonic field
+    /// and 6 of the 7 sacred layers.
+    ///
+    /// Odd-harmonic-rich (still odd-symmetric about every zero crossing) so at
+    /// the Lemurian 432 Hz keynote she rings Tesla 3 (1296 Hz), Pythagorean 5
+    /// (2160 Hz), sacred 7 (3024 Hz), and Tesla 9 (3888 Hz) inherent in the
+    /// waveform. The φ-shaping additionally softens the zero crossings (slope
+    /// approaches 0 at the bottom of each cycle) and sharpens the peaks
+    /// (slope ±4φ ≈ ±6.47 at each extremum, larger discontinuity than a linear
+    /// triangle's ±4) — brighter top, calmer bottom, like a struck bowl
+    /// swelling to a focused peak then receding.
     /// </summary>
     Triangle,
 }
@@ -87,16 +104,33 @@ public static class WaveShapes
     }
 
     /// <summary>
-    /// Triangle wave: starts at 0, peaks at +1 at quarter cycle, returns to 0 at
-    /// half cycle, trough -1 at three-quarter cycle, back to 0 at full cycle.
-    /// Same period and peak amplitude as sin(phase), so it's a drop-in replacement
-    /// in any place that was previously calling Math.Sin for a tone-generation purpose.
+    /// Triangle wave with PHI-shaped segments: starts at 0, peaks at +1 at quarter
+    /// cycle, returns to 0 at half cycle, trough -1 at three-quarter cycle, back
+    /// to 0 at full cycle. Same period, peak amplitude, and zero-crossing geometry
+    /// as a linear triangle (and as sin), so it's a drop-in replacement anywhere
+    /// the codebase previously called Sin for tone generation.
     ///
-    /// Implementation: piecewise linear (no asin / no Math calls beyond Floor)
-    /// for hot-path efficiency. Triangle wave's mathematical Fourier series is
-    /// inherent in the shape — odd harmonics at 1/n² amplitude — so calling this
-    /// at 432 Hz gives us Lemurian keynote + Tesla 3 (1296) + Pythagorean 5
-    /// (2160) + Tesla 9 (3888) etc., all in one waveform.
+    /// The piecewise segments are NOT linear. Each quarter-cycle climb or descent
+    /// follows <c>y = x^φ</c> (PHI ≈ 1.618), where x is the linear position within
+    /// the segment normalized to [0, 1]. The golden ratio shapes the curvature of
+    /// the wave just as it shapes the breath ladder, the modulation, the fade
+    /// timings, and the torus geometry — the curve of the wave is the curve of
+    /// everything else she does. Linear ramps belong to mechanical instruments;
+    /// φ ramps belong to her.
+    ///
+    /// Slope characteristics vs. a linear triangle (slope ±4 throughout):
+    ///   - At zero crossings (t = 0, 0.5, 1): slope → 0 — smooth approach, no
+    ///     buzz at the bottom of each cycle.
+    ///   - At each extremum (t = 0.25 peak, 0.75 trough): slope = ±4·φ ≈ ±6.47,
+    ///     jump of 12.94 across the corner (vs. linear triangle's 8) — sharper,
+    ///     richer in upper odd harmonics.
+    ///   - Net timbre: brighter at the top of each cycle, calmer at the bottom;
+    ///     like a struck crystal bowl swelling to a focused peak then receding.
+    ///
+    /// Cost: one <c>Math.Pow</c> per sample per voice. Accepted in service of
+    /// sacred shape over linear synthesis — performance loss is a fraction of a
+    /// percent of the existing pipeline and the rest of the design assumes this
+    /// trade.
     /// </summary>
     public static float Triangle(double phase)
     {
@@ -106,13 +140,24 @@ public static class WaveShapes
         double t = phase / SacredConstants.TWO_PI_D;
         t -= System.Math.Floor(t);  // wrap to [0, 1) — handles negative phases too
 
-        // Triangle shape over the cycle (matches sin start/zero crossings):
-        //   t ∈ [0,    0.25)  : ramp 0 → +1     (slope +4)
-        //   t ∈ [0.25, 0.75)  : ramp +1 → -1   (slope -4, crosses zero at t=0.5)
-        //   t ∈ [0.75, 1.0)   : ramp -1 → 0     (slope +4)
-        if (t < 0.25) return (float)(4.0 * t);
-        if (t < 0.75) return (float)(2.0 - 4.0 * t);
-        return (float)(4.0 * t - 4.0);
+        // Each quarter cycle is its own segment. We split the full cycle into four
+        // equal segments (rather than the linear triangle's three) so that every
+        // segment runs between an extremum and a zero crossing — that way the
+        // PHI power can be applied to a quantity that always rises from 0 to 1
+        // within the segment, then we negate as needed for the negative half-cycle.
+        //
+        //   t ∈ [0,    0.25)  :  +(4t)^φ          climb 0 → +1
+        //   t ∈ [0.25, 0.5)   :  +(2 - 4t)^φ      descent +1 → 0
+        //   t ∈ [0.5,  0.75)  :  -(4t - 2)^φ      climb (negated) 0 → -1
+        //   t ∈ [0.75, 1.0)   :  -(4 - 4t)^φ      descent (negated) -1 → 0
+        //
+        // PHI is pulled from SacredConstants — same constant the breath ladder,
+        // fade timings, torus radii, and reverb decay multiplier are built on.
+        // Math.Pow takes double, so the implicit float→double cast on PHI is fine.
+        if (t < 0.25) return (float)System.Math.Pow(4.0 * t, SacredConstants.PHI);
+        if (t < 0.5)  return (float)System.Math.Pow(2.0 - 4.0 * t, SacredConstants.PHI);
+        if (t < 0.75) return -(float)System.Math.Pow(4.0 * t - 2.0, SacredConstants.PHI);
+        return -(float)System.Math.Pow(4.0 - 4.0 * t, SacredConstants.PHI);
     }
 
     #endregion
