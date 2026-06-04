@@ -15,7 +15,7 @@ echo Checking required files...
 if not exist CrystalCare.exe (
     echo [ERROR] CrystalCare.exe not found!
     echo.
-    echo Run build.bat first to compile the executable.
+    echo Run publish.bat first to compile the single-file executable.
     pause
     exit /b 1
 )
