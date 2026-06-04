@@ -221,6 +221,30 @@ public sealed partial class SoundGenerator
         if (schedule.Count > 12)
             DiagnosticLogger.Log($"  ... ({schedule.Count - 12} more segments elided)");
 
+        // For Dimensional Journey (Mode 7), log the 9 dimensions explicitly so
+        // the user can read which dimension is active at each time range, which
+        // ratio set drives its modulation, and which voices in the harmonic field
+        // are emphasized. This is the "1D-9D Realignment" journey made legible.
+        if (dimensionalMode)
+        {
+            DiagnosticLogger.LogSection("Dimensional Journey schedule (9 phases)");
+            float phaseSec = duration / DimensionalJourney.DIMENSIONS.Length;
+            for (int d = 0; d < DimensionalJourney.DIMENSIONS.Length; d++)
+            {
+                var dim = DimensionalJourney.DIMENSIONS[d];
+                float dimStart = d * phaseSec;
+                float dimEnd = (d == DimensionalJourney.DIMENSIONS.Length - 1)
+                    ? duration : (d + 1) * phaseSec;
+                DiagnosticLogger.Log(
+                    $"  {dim.Label,-30} {dimStart,7:F1}s..{dimEnd,7:F1}s  " +
+                    $"ratio={dim.RatioSetKey,-18}  modIndex={dim.ModIndex:F3}");
+            }
+            DiagnosticLogger.Log(
+                "  Per-dimension amp scales shift the 13-voice spectral center upward " +
+                "as the journey ascends (subharmonics emphasized in low dimensions, " +
+                "upper PHI exponents emphasized in high dimensions).");
+        }
+
         // Draw two session-level chaotic values from the logistic map.
         // chaoticFactor: per-session frequency offset folded into the Stage 3 modulation
         //                array (see chaoticOffset below) — a chaotic pitch fingerprint.
@@ -653,25 +677,64 @@ public sealed partial class SoundGenerator
                     ComputeTaygetanBinauralFreqs(allFrequencies, halfBeat);
 
                 // Same generator call as standard modes — just with separate L/R
-                // freq arrays. No amp-scale override; the natural decay 0.015/(f+1)
-                // applies uniformly across all voices, identical to other modes.
+                // freq arrays + sineLeadingCount = TaygetanBinauralVoiceCount (9).
+                // The first 9 voices stay pure sine because they're the binaural
+                // carriers — L/R difference detection in the brain entrains cleanest
+                // when the carriers are pure single-frequency tones. The remaining
+                // 4 subharmonic body voices get the default Triangle shape,
+                // contributing the Tesla 3-6-9 + Pythagorean 5 + Solfeggio crown
+                // harmonics that come inherent in the triangle waveform.
                 waveLeft = HarmonicGenerator.GenerateHarmonics(
                     tChunk, taygetanFreqsL, envelope, lfoLeft, modDepths,
-                    fractalVar, PhaseModulationScale);
+                    fractalVar, PhaseModulationScale,
+                    waveShape: WaveShape.Triangle,
+                    sineLeadingCount: TaygetanBinauralVoiceCount);
                 waveRight = HarmonicGenerator.GenerateHarmonics(
                     tChunk, taygetanFreqsR, envelope, lfoRight, modDepths,
-                    fractalVar, PhaseModulationScale);
+                    fractalVar, PhaseModulationScale,
+                    waveShape: WaveShape.Triangle,
+                    sineLeadingCount: TaygetanBinauralVoiceCount);
             }
             else
             {
                 // Standard pipeline: same frequency array for both channels;
                 // stereo decorrelation comes from different LFO arrays per channel.
+                // All 13 voices triangle — the sacred form of the harmonic field
+                // (Tesla 3-6-9 + Pythagorean 5 + Solfeggio crown live inside the
+                // triangle waveform's odd harmonics at the Lemurian 432 Hz keynote).
+                //
+                // For Dimensional Journey mode (Mode 7), we ALSO apply per-dimension
+                // amp scales — the 13-voice field's "spectral center of mass" journeys
+                // upward as the session ascends through 1D → 9D. The CARRIER stays
+                // anchored at 432 Hz (Lemurian keynote), but the FELT center moves
+                // from subharmonic body voices (low dimensions) to upper PHI exponents
+                // (crown band). For non-dimensional modes, dimAmpScales stays empty
+                // (default) and the natural 0.015/(f+1) decay applies uniformly.
+                ReadOnlySpan<float> dimAmpScales = default;
+                if (dimensionalMode)
+                {
+                    // Look up the active dimension at this chunk's mid-time AND
+                    // smootherstep-blend into the next dimension during the last
+                    // 15% of each phase. This makes the carrier journey transitions
+                    // gentle organic shifts instead of hard switches at boundaries.
+                    // 9 equal-duration phases over the session — chunk-mid sampling
+                    // picks the dimension cleanly within each phase, with the
+                    // smootherstep blend handling boundaries.
+                    double midSec = chunkSamples > 0 ? tChunk[chunkSamples / 2] : 0.0;
+                    dimAmpScales = DimensionalJourney.ComputeAmpScalesAt(
+                        (float)midSec, duration);
+                }
+
                 waveLeft = HarmonicGenerator.GenerateHarmonics(
                     tChunk, allFrequencies, envelope, lfoLeft, modDepths,
-                    fractalVar, PhaseModulationScale);
+                    fractalVar, PhaseModulationScale,
+                    ampScales: dimAmpScales,
+                    waveShape: WaveShape.Triangle);
                 waveRight = HarmonicGenerator.GenerateHarmonics(
                     tChunk, allFrequencies, envelope, lfoRight, modDepths,
-                    fractalVar, PhaseModulationScale);
+                    fractalVar, PhaseModulationScale,
+                    ampScales: dimAmpScales,
+                    waveShape: WaveShape.Triangle);
             }
 
             // After Stage 6 — log peak/RMS so we can see what the harmonic field
@@ -830,6 +893,21 @@ public sealed partial class SoundGenerator
                 }
                 catch (AggregateException) { }
 
+                // For Dimensional Journey, compute per-sacred-layer emphasis at this
+                // chunk's mid-time. Each dimension foregrounds the layer(s) most
+                // aligned with its meaning (e.g., 1D → Water dominant, 5D → Merkaba
+                // dominant, 9D → Blue Ray dominant), so the journey's character
+                // shifts which layer leads as it ascends. Smootherstep crossfade at
+                // dimension boundaries (last 15% of each phase blends into the next).
+                // Non-dimensional modes: layerEmphasis stays null; multiplier = 1.0.
+                float[]? dimLayerEmphasis = null;
+                if (dimensionalMode)
+                {
+                    double midSec = chunkSamples > 0 ? tChunk[chunkSamples / 2] : 0.0;
+                    dimLayerEmphasis = DimensionalJourney.ComputeLayerEmphasisAt(
+                        (float)midSec, duration);
+                }
+
                 // Mix each sacred layer into the stereo field with independent toroidal panning.
                 // Each layer's panning starts at a golden angle offset from the previous,
                 // ensuring maximum spatial separation like sunflower seeds on a torus.
@@ -844,6 +922,12 @@ public sealed partial class SoundGenerator
                     float spFreq = sacredPhiFreqs[li];
                     float phaseOff = sacredPhaseOffsets[li];
 
+                    // Apply dimensional layer emphasis (Mode 7 only). For other modes
+                    // this stays at 1.0 (no change in layer amplitudes). Per dimension,
+                    // some layers boost (>1.0) and some quiet (<1.0) — sum across the
+                    // 7 layers stays roughly balanced so total energy doesn't spike.
+                    float dimEmphasis = dimLayerEmphasis != null ? dimLayerEmphasis[li] : 1.0f;
+
                     for (int i = 0; i < chunkSamples; i++)
                     {
                         // Compute torus position with golden angle phase offset.
@@ -857,9 +941,11 @@ public sealed partial class SoundGenerator
                             (float)System.Math.Cos(sThetaD) / (sacredR + sacredRSmall);
                         float panScaled = sacredPan * 0.4f;
 
-                        // Mix into left and right channels with pan weighting
-                        waveLeft[i] += layerData[i] * (1.0f - panScaled);
-                        waveRight[i] += layerData[i] * (1.0f + panScaled);
+                        // Mix into left and right channels with pan weighting,
+                        // scaled by the per-dimension layer emphasis (1.0 for non-Mode-7).
+                        float emphasized = layerData[i] * dimEmphasis;
+                        waveLeft[i] += emphasized * (1.0f - panScaled);
+                        waveRight[i] += emphasized * (1.0f + panScaled);
                     }
                 }
             }

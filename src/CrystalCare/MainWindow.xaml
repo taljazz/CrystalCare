@@ -9,7 +9,8 @@
         Height="600" Width="600"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing"
-        AutomationProperties.Name="CrystalCare Sound Healing Application">
+        AutomationProperties.Name="CrystalCare Sound Healing Application"
+        FocusManager.FocusedElement="{Binding ElementName=FreqChoice}">
 
     <DockPanel LastChildFill="True">
         <StackPanel DockPanel.Dock="Top" Margin="10">

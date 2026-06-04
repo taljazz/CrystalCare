@@ -36,10 +36,26 @@ public static class HarmonicGenerator
     /// schedule (one ratio emphasized per window, others ride at baseline). When
     /// empty, every frequency runs at its natural decay scale (legacy behavior).
     /// </param>
+    /// <param name="waveShape">
+    /// Wave shape for the voices. Default Triangle — the harmonic field's sacred
+    /// form. Triangle at the Lemurian 432 Hz keynote sounds Tesla's 3/9 + Pythagorean
+    /// 5 + Solfeggio crown as inherent odd harmonics in a single waveform, matching
+    /// her geometric DNA (Merkaba = star tetrahedron). Pass Sine for binaural
+    /// carriers (cleanest L/R difference detection) or legacy callers.
+    /// </param>
+    /// <param name="sineLeadingCount">
+    /// Number of leading voices forced to sine regardless of <paramref name="waveShape"/>.
+    /// Used by Taygetan mode (sineLeadingCount = 9) so the first 9 voices act as pure-sine
+    /// binaural carriers (L/R difference detection wants pure sines) while the rest of
+    /// the field (subharmonic body voices) gets the chosen waveShape. 0 means all voices
+    /// use waveShape uniformly.
+    /// </param>
     public static float[] GenerateHarmonics(ReadOnlySpan<double> t, float[] frequencies,
         ReadOnlySpan<float> envelope, ReadOnlySpan<float> lfo, float[] modDepths,
         ReadOnlySpan<float> phaseModulation = default, float phaseModulationScale = 0f,
-        ReadOnlySpan<float> ampScales = default)
+        ReadOnlySpan<float> ampScales = default,
+        WaveShape waveShape = WaveShape.Triangle,
+        int sineLeadingCount = 0)
     {
         int nSamples = t.Length;
         int nFreqs = frequencies.Length;
@@ -66,23 +82,32 @@ public static class HarmonicGenerator
             float scale = 0.015f / (f + 1);
             if (useAmpScales) scale *= ampScales[f];
 
+            // Per-voice wave shape. First sineLeadingCount voices stay sine (used by
+            // Taygetan to keep its binaural carriers pure); the rest use waveShape.
+            // For non-Taygetan modes sineLeadingCount = 0, so every voice uses waveShape.
+            WaveShape voiceShape = f < sineLeadingCount ? WaveShape.Sine : waveShape;
+
             for (int i = 0; i < nSamples; i++)
             {
                 // Cross-modulation signal — PHI_INVERSE harmonic relationship in radians.
                 // Each carrier has its own modSignal (depends on freq), creating
-                // per-frequency variation in the timbral fingerprint.
+                // per-frequency variation in the timbral fingerprint. We keep the
+                // modulator on a pure sine even when the voice is triangle — the
+                // mod is a phase-displacement driver, not a voice, so sine math
+                // keeps the cross-modulation organic and predictable.
                 float modSignal = (float)System.Math.Sin(SacredConstants.TWO_PI_D * modFreq * t[i]) * modDepth;
 
                 // Compose the full phase. Base term + cross-mod + optional organic drift.
                 // The phase modulation term (when active) is the SAME for all carriers
-                // at sample i, so all 13 harmonics drift together as one slowly-evolving
+                // at sample i, so all voices drift together as one slowly-evolving
                 // bank — like the breath of the entire harmonic field.
                 double phase = SacredConstants.TWO_PI_D * freq * t[i] + modSignal;
                 if (usePhaseModulation)
                     phase += phaseModulationScale * phaseModulation[i];
 
-                // Compute sine in double, cast back to float for the audio sample
-                float wave = (float)System.Math.Sin(phase);
+                // Evaluate the chosen wave shape at this phase — sine (pure) or
+                // triangle (sacred odd-harmonic content baked into the waveform).
+                float wave = WaveShapes.Compute(voiceShape, phase);
                 result[i] += wave * envelope[i] * scale * lfo[i];
             }
         }

@@ -1,3 +1,4 @@
+using CrystalCare.Core.Dsp;
 using CrystalCare.Core.Frequencies;
 
 namespace CrystalCare.Core.SacredLayers;
@@ -81,8 +82,15 @@ public sealed class WaterElementLayer : SacredLayerBase
                 // Spatial envelope: exponential decay with distance
                 float envelope = MathF.Exp(-sourceDecays[s] * dist * 10.0f);
 
-                // Wave from this source — double precision phase
-                float wave = (float)System.Math.Sin(SacredConstants.TWO_PI_D * sourceFreq * tChunk[i] + hexPhases[s]);
+                // Wave from this source — TRIANGLE waveform now (matches the
+                // rest of the harmonic field). Each of the 7 hexagonal source
+                // voices rings with triangle's inherent odd harmonics. The
+                // lemniscate path and observer-distance envelope above stay as
+                // sin/cos because they're spatial-geometry math, not voices.
+                // Standing-wave resonance below also stays sin×cos because
+                // that's a standing-wave MATHEMATICAL model (sum/diff
+                // frequencies), not a voice.
+                float wave = WaveShapes.Triangle(SacredConstants.TWO_PI_D * sourceFreq * tChunk[i] + hexPhases[s]);
                 result[i] += wave * envelope;
             }
         }

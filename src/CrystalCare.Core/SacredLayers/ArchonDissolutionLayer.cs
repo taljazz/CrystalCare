@@ -1,3 +1,4 @@
+using CrystalCare.Core.Dsp;
 using CrystalCare.Core.Frequencies;
 
 namespace CrystalCare.Core.SacredLayers;
@@ -67,17 +68,20 @@ public sealed class ArchonDissolutionLayer : SacredLayerBase
             for (int i = 0; i < n; i++)
                 phaseVar[i] *= 0.1f;
 
-            // AEG: Acknowledge + Elevate + Ground — double precision phase
+            // AEG: Acknowledge + Elevate + Ground — TRIANGLE voices, matching the
+            // rest of the harmonic field. Each Archon's three waves carry Tesla 3-6-9
+            // + Pythagorean 5 odd harmonics inherent in the triangle waveform,
+            // adding sacred-mathematics density without new voices.
             double ackFreq = archonFreqs[j];
             double elevFreq = elevateFreqs[j];
             double gndFreq = groundFreqs[j];
             for (int i = 0; i < n; i++)
             {
-                float ack = (float)System.Math.Sin(SacredConstants.TWO_PI_D * ackFreq * tChunk[i] +
+                float ack = WaveShapes.Triangle(SacredConstants.TWO_PI_D * ackFreq * tChunk[i] +
                     basePhase + phaseVar[i]);
-                float elev = (float)System.Math.Sin(SacredConstants.TWO_PI_D * elevFreq * tChunk[i] +
+                float elev = WaveShapes.Triangle(SacredConstants.TWO_PI_D * elevFreq * tChunk[i] +
                     basePhase * SacredConstants.PHI + phaseVar[i]);
-                float gnd = (float)System.Math.Sin(SacredConstants.TWO_PI_D * gndFreq * tChunk[i] +
+                float gnd = WaveShapes.Triangle(SacredConstants.TWO_PI_D * gndFreq * tChunk[i] +
                     phaseVar[i] * 0.5f);
                 dissolution[i] += (0.25f * ack + 0.5f * elev + 0.25f * gnd) * ampScales[j];
             }

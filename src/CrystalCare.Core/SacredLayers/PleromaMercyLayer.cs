@@ -56,24 +56,27 @@ public sealed class PleromaMercyLayer : SacredLayerBase
         for (int i = 0; i < n; i++)
             phaseWobble[i] *= 0.08f;
 
-        // Sum 13 aeonic harmonics — double precision phase for long-session stability
+        // Sum 13 aeonic harmonics as TRIANGLE voices — the layer's tone now matches
+        // its geometric DNA (aeonic ladder ascending via PHI × Schumann). Triangle's
+        // odd-harmonic content adds Tesla 3-6-9 + Pythagorean 5 overtones inherent
+        // in the waveform itself. Double precision phase for long-session stability.
         var aeonicWave = new float[n];
         for (int h = 0; h < 13; h++)
         {
             double freq = SacredConstants.SCHUMANN * aeonic[h];
             float phase = pentPhases[h % 5];
             for (int i = 0; i < n; i++)
-                aeonicWave[i] += (float)System.Math.Sin(SacredConstants.TWO_PI_D * freq * tChunk[i] +
+                aeonicWave[i] += WaveShapes.Triangle(SacredConstants.TWO_PI_D * freq * tChunk[i] +
                     phase + phaseWobble[i]);
         }
 
-        // Layer 2: Ogdoad Gateway
+        // Layer 2: Ogdoad Gateway (single carrier — also triangle)
         for (int i = 0; i < n; i++)
             tScaled[i] = (float)(tChunk[i] * 0.00001);
         var ogdoadPhase = simplex.GenerateNoise(tScaled, 1f, 1f, 1f, 1f);
         var ogdoadWave = new float[n];
         for (int i = 0; i < n; i++)
-            ogdoadWave[i] = (float)System.Math.Sin(SacredConstants.TWO_PI_D * SacredConstants.OGDOAD_FREQ *
+            ogdoadWave[i] = WaveShapes.Triangle(SacredConstants.TWO_PI_D * SacredConstants.OGDOAD_FREQ *
                 tChunk[i] + ogdoadPhase[i] * 0.05f);
 
         // Layer 3: Archon Harmonizing
@@ -87,13 +90,14 @@ public sealed class PleromaMercyLayer : SacredLayerBase
         }
         for (int j = 0; j < 7; j++) archonAmps[j] /= ampSum;
 
+        // Archon mercy waves — also triangle, matching the rest of the field
         var archonMercy = new float[n];
         for (int j = 0; j < 7; j++)
         {
             float archonPhase = pentPhases[j % 5];
             double archonFreq = archonSpheres[j];
             for (int i = 0; i < n; i++)
-                archonMercy[i] += archonAmps[j] * (float)System.Math.Sin(
+                archonMercy[i] += archonAmps[j] * WaveShapes.Triangle(
                     SacredConstants.TWO_PI_D * archonFreq * tChunk[i] + archonPhase);
         }
 

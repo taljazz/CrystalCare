@@ -109,7 +109,15 @@ public sealed class CrystalProfileLibrary
                 if (phaseWobble != null)
                     phase += phaseWobble[i];
 
-                result[i] += weight * (float)System.Math.Sin(phase);
+                // Triangle wave: crystal harmonics now share the wave shape of
+                // the main harmonic field. At the Lemurian 432 Hz keynote,
+                // triangle wraps Tesla 3-6-9 + Pythagorean 5 + Solfeggio crown
+                // into one waveform per voice. Crystals' Raman ratios then
+                // multiply each of those harmonics, so each crystal becomes
+                // a Raman-tuned fan of sacred-mathematics-aligned overtones
+                // (e.g., a Lemurian Quartz harmonic at 540 Hz now also rings
+                // 1620, 2700, 3780, 4860 — Pythagorean 5/4 × Tesla 3-6-9).
+                result[i] += weight * WaveShapes.Triangle(phase);
             }
         }
 

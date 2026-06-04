@@ -55,39 +55,71 @@ public sealed partial class SoundGenerator
     /// Dimensional mode: 7 phases + all-ratios finale.
     /// Normal mode: Fibonacci-timed intervals with random ratio set selection.
     /// </summary>
-    private List<(int start, int end, float[] ratioValues, float modIndex)>
+    private List<(int start, int end, float[] ratioValues, float modIndex, int headFade, int tailFade)>
         BuildModulationSchedule(float duration, int totalSamples, int sampleRate,
             int[] intervalDurations, bool dimensionalMode, CancellationToken ct)
     {
-        var schedule = new List<(int, int, float[], float)>();
+        var schedule = new List<(int, int, float[], float, int, int)>();
         int current = 0;
 
         if (dimensionalMode)
         {
-            // Dimensional Journey: cycle through 7 frequency dimension phases
-            int[] phases = [0, 2, 1, 3, 4, 3, 5];
-            int phaseLen = totalSamples / (phases.Length + 1);
-            foreach (int sel in phases)
+            // Dimensional Journey: 9 equal-duration phases, one per dimension (1D-9D).
+            // Each phase uses its dimension-specific ratio set and modulation intensity
+            // from DimensionalJourney.DIMENSIONS. This replaces the prior implementation
+            // which iterated a `sel` dimension index but never used it — every phase
+            // just picked a RANDOM ratio set, and 3D was missing entirely. The dimension
+            // labels were decorative; the audio didn't actually distinguish dimensions.
+            //
+            // Now: 1D → minimal (Metatron √2 only — foundational anchor)
+            //      2D → fibonacci_set (PHI-based — Atlantean cosmic)
+            //      3D → triple_helix (DNA 1.0/1.2/1.4 — the physical body)  ← FILLED IN (was missing)
+            //      4D → flower_of_life (soft 1.3/1.5/2.5 — astral flow)
+            //      5D → sacred_geometry (full Pythagorean)
+            //      6D → combined (sacred + flower — bridging structure)
+            //      7D → fractal_set (transcendental π and e — soul/causal)
+            //      8D → taygetan (Pleiadian / Taygetan ratios)
+            //      9D → all_blended (every distinct ratio sounding together — Source culmination)
+            //
+            // headFade/tailFade samples enable smootherstep crossfades between phases:
+            // middle phases get both edges faded; the first phase opens at full
+            // (no head fade) so the session starts cleanly at 1D; the last phase
+            // closes at full (no tail fade) so the session ends in pure 9D.
+            int dimCount = DimensionalJourney.DIMENSIONS.Length;
+            int phaseLen = totalSamples / dimCount;
+            int xfadeSamples = (int)(phaseLen * DimensionalJourney.CROSSFADE_FRACTION);
+            for (int d = 0; d < dimCount; d++)
             {
                 if (ct.IsCancellationRequested) break;
-                var ratioSet = _frequencyManager.SelectRandomRatioSet(ct);
-                float modIndex = (float)(_rng.NextDouble() * 0.05 + 0.2);
-                int end = global::System.Math.Min(current + phaseLen, totalSamples);
-                schedule.Add((current, end, ratioSet.Values.ToArray(), modIndex));
+
+                // Look up the dimension's specific ratio set + modulation intensity
+                var dim = DimensionalJourney.DIMENSIONS[d];
+                var ratios = DimensionalJourney.ResolveRatios(dim);
+                float modIndex = dim.ModIndex;
+
+                // Last phase extends to totalSamples to absorb any integer-division
+                // remainder so the schedule covers the full session with no silence
+                // gap at the end.
+                int end = (d == dimCount - 1)
+                    ? totalSamples
+                    : global::System.Math.Min(current + phaseLen, totalSamples);
+
+                // First phase: no head fade (open at full 1D presence).
+                // Last phase: no tail fade (end at full 9D presence).
+                // Middle phases: both edges fade (smootherstep crossfade to neighbors).
+                int headFade = (d == 0) ? 0 : xfadeSamples;
+                int tailFade = (d == dimCount - 1) ? 0 : xfadeSamples;
+
+                schedule.Add((current, end, ratios, modIndex, headFade, tailFade));
                 current = end;
-            }
-            // Final "all ratios" phase — every sacred geometry ratio active simultaneously
-            if (current < totalSamples)
-            {
-                var allRatios = FrequencyManager.RatioSets.Values
-                    .SelectMany(d => d.Values).Distinct().ToArray();
-                float modIndex = (float)(_rng.NextDouble() * 0.05 + 0.2);
-                schedule.Add((current, totalSamples, allRatios, modIndex));
             }
         }
         else
         {
-            // Normal mode: cycle through Fibonacci-timed intervals [34, 55, 89, 144]
+            // Normal mode: cycle through Fibonacci-timed intervals [34, 55, 89, 144].
+            // headFade/tailFade = 0 so the legacy non-dimensional behavior is preserved
+            // exactly (no smootherstep weighting — each segment plays at full modIndex
+            // for its entire duration, instant switch at boundaries as before).
             float remaining = duration;
             int intervalCount = 0;
             while (remaining > 0 && !ct.IsCancellationRequested)
@@ -101,7 +133,7 @@ public sealed partial class SoundGenerator
                 var ratioSet = _frequencyManager.SelectRandomRatioSet(ct);
                 float modIndex = (float)(_rng.NextDouble() * 0.05 + 0.2);
                 int end = global::System.Math.Min(current + segSamples, totalSamples);
-                schedule.Add((current, end, ratioSet.Values.ToArray(), modIndex));
+                schedule.Add((current, end, ratioSet.Values.ToArray(), modIndex, 0, 0));
                 current = end;
                 remaining -= interval;
                 intervalCount++;
@@ -115,16 +147,23 @@ public sealed partial class SoundGenerator
     /// Compute modulation values for a single chunk from the pre-built schedule.
     /// Only processes schedule segments that overlap with this chunk's sample range.
     /// Each active ratio contributes a sine wave at modulationIndex amplitude.
+    ///
+    /// Each segment may have head/tail fade samples (used by Dimensional Journey
+    /// mode for smootherstep crossfades between adjacent dimensions). When non-zero,
+    /// the first headFade samples ramp 0 → 1 via Perlin smootherstep, and the last
+    /// tailFade samples ramp 1 → 0 via smootherstep. For non-dimensional modes the
+    /// fade samples are 0 so the segment plays at full modIndex throughout (exact
+    /// legacy behavior preserved).
     /// </summary>
     private static float[] ComputeModulationChunk(ReadOnlySpan<double> tChunk,
         int chunkOffset, int chunkSamples,
-        List<(int start, int end, float[] ratioValues, float modIndex)> schedule)
+        List<(int start, int end, float[] ratioValues, float modIndex, int headFade, int tailFade)> schedule)
     {
         var result = new float[chunkSamples];
         int chunkEnd = chunkOffset + chunkSamples;
 
         // Only process schedule segments that overlap with this chunk
-        foreach (var (start, end, ratioValues, modIndex) in schedule)
+        foreach (var (start, end, ratioValues, modIndex, headFade, tailFade) in schedule)
         {
             if (start >= chunkEnd || end <= chunkOffset) continue;
 
@@ -132,16 +171,62 @@ public sealed partial class SoundGenerator
             int localStart = global::System.Math.Max(0, start - chunkOffset);
             int localEnd = global::System.Math.Min(chunkSamples, end - chunkOffset);
 
-            // Sum sine waves for each ratio in this segment — double precision phase
+            // Phase length (used for the tail-fade weight calculation)
+            int phaseLength = end - start;
+
+            // Pre-decide whether this phase has any crossfade. If both are 0
+            // (non-dimensional mode), skip the per-sample weight branch entirely
+            // for negligible-cost hot-path execution.
+            bool hasCrossfade = headFade > 0 || tailFade > 0;
+
+            // Sum sine waves for each ratio in this segment — double precision phase.
+            // With crossfade active, each sample's contribution is weighted by the
+            // smootherstep-position so adjacent dimensions blend seamlessly at boundaries.
             for (int r = 0; r < ratioValues.Length; r++)
             {
                 double ratio = ratioValues[r];
                 for (int i = localStart; i < localEnd; i++)
-                    result[i] += modIndex * (float)System.Math.Sin(SacredConstants.TWO_PI_D * ratio * tChunk[i]);
+                {
+                    float weight = 1.0f;
+                    if (hasCrossfade)
+                    {
+                        // Position within phase: 0 at start, phaseLength at end
+                        int posInPhase = (chunkOffset + i) - start;
+
+                        if (headFade > 0 && posInPhase < headFade)
+                        {
+                            // First headFade samples ramp 0 → 1 via smootherstep
+                            float x = posInPhase / (float)headFade;
+                            weight = Smootherstep(x);
+                        }
+                        else if (tailFade > 0 && posInPhase >= phaseLength - tailFade)
+                        {
+                            // Last tailFade samples ramp 1 → 0 via smootherstep
+                            float x = (phaseLength - posInPhase) / (float)tailFade;
+                            weight = Smootherstep(x);
+                        }
+                    }
+
+                    result[i] += weight * modIndex *
+                        (float)System.Math.Sin(SacredConstants.TWO_PI_D * ratio * tChunk[i]);
+                }
             }
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Perlin smootherstep: 6t⁵ − 15t⁴ + 10t³. Smooth at both endpoints
+    /// (zero first and second derivatives), no overshoot. Used by the
+    /// modulation crossfade in dimensional mode and by every other crossfade
+    /// curve in the codebase (Crystalline, Taygetan ratio bias). Kept local
+    /// here so ComputeModulationChunk doesn't reach across files.
+    /// </summary>
+    private static float Smootherstep(float t)
+    {
+        t = global::System.Math.Clamp(t, 0f, 1f);
+        return t * t * t * (t * (t * 6f - 15f) + 10f);
     }
 
     #endregion
@@ -179,11 +264,18 @@ public sealed partial class SoundGenerator
         for (int i = 0; i < estSamples; i++)
             estT[i] = quarterPeriod + (double)i / sampleRate;
 
-        // Generate test harmonics at full envelope with LFO modulation
+        // Generate test harmonics at full envelope with LFO modulation.
+        // Use waveShape: Triangle to match the runtime pipeline (triangle is the
+        // default for the harmonic field in v5.1+). Without this, the test signal
+        // would be sine while the real signal is triangle, and normGain would be
+        // calibrated to the wrong waveform — same class of bug as the old Stage 7
+        // omission. Triangle and sine share the same peak amplitude (±1.0) so the
+        // gain estimate stays well-matched.
         var estEnv = new float[estSamples];
         Array.Fill(estEnv, 1.0f);
         var estLfo = MicrotonalLfo.Compute(estT, lfoParams);
-        var estWave = HarmonicGenerator.GenerateHarmonics(estT, frequencies, estEnv, estLfo, modDepths);
+        var estWave = HarmonicGenerator.GenerateHarmonics(estT, frequencies, estEnv, estLfo, modDepths,
+            waveShape: WaveShape.Triangle);
 
         // Stage 7 simulation — REMOVED in Path 4+ architecture. The Taygetan
         // binaural sync is now woven directly through the Stage 6 harmonic field

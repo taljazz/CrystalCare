@@ -50,7 +50,12 @@ public sealed class LemurianMerkabaLayer : SacredLayerBase
         for (int i = 0; i < n; i++)
             wobble[i] *= 0.015f;
 
-        // Generate 4 Merkaba tones — double precision phase for long-session stability
+        // Generate 4 Merkaba tones — TRIANGLE waves. The Merkaba IS a star
+        // tetrahedron (two interlocked tetrahedra = 8 triangles total in
+        // 3D form). The waveform now matches the geometric form: the four
+        // Lemurian Frequency Quartet tones each ring as triangles, sounding
+        // their odd harmonics (Tesla 3/9 + Pythagorean 5) within each voice.
+        // Double precision phase for long-session stability.
         var freqs = SacredConstants.MERKABA_FREQS;
         var phases = SacredConstants.MERKABA_PHASES;
         var weights = SacredConstants.MERKABA_WEIGHTS;
@@ -61,7 +66,7 @@ public sealed class LemurianMerkabaLayer : SacredLayerBase
             double freq = freqs[f];
             float phase = phases[f];
             for (int i = 0; i < n; i++)
-                merkaba[i] += weights[f] * (float)System.Math.Sin(
+                merkaba[i] += weights[f] * WaveShapes.Triangle(
                     SacredConstants.TWO_PI_D * freq * tChunk[i] + phase + wobble[i]);
         }
 

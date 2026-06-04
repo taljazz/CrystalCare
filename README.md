@@ -12,6 +12,7 @@ CrystalCare operates outside the framework of conventional linear-based science.
 
 Most sound healing tools aim for patterns — predictable beats, steady drones, repeating cycles. CrystalCare moves the other direction. She is built with **mathematical unpredictability** so the conscious mind cannot latch onto a pattern. When the mind has nothing to anticipate, it quiets. When it quiets, the body and heart can receive what the mathematics carries.
 
+- **Triangle waveform voices** — every voice in the harmonic field and six of the seven sacred layers generates triangle waves. At the Lemurian 432 Hz keynote, the triangle's odd harmonics inherently sound the Tesla 3-6-9 vortex, Pythagorean 5, and Solfeggio crown frequencies within a single waveform. Sine is kept for Blue Ray (the still axis — purity by design), Taygetan binaural carriers (binaural sync wants pure sines), and every sub-audible modulator.
 - **Rössler chaotic panning** — bounded mathematical chaos drives the spatial field. The sound never retraces the same path.
 - **Organic randomization** — every parameter (ADSR envelopes, LFO depths, crystal sequences, modulation intervals) is drawn fresh each session within sacred bounds.
 - **Sub-perceptual sacred layers** — seven layers working beneath conscious hearing, each breathing at its own PHI-derived rhythm.
@@ -41,7 +42,7 @@ Streaming playback is unlimited in length. She uses ~50 MB of memory regardless 
 | **Combined Mode** | Sacred Geometry + Flower of Life ratios | Composite sacred geometry |
 | **Triple Helix DNA Activation** | 1.0, 1.2, 1.4 ratios | DNA-inspired recursive feedback |
 | **Taygetan Resonances** | Standard 13-voice harmonic field at 432, 528, or 963 Hz base (random per session) | 7.7 Hz binaural sync woven through the harmonic field; the 7 sacred Taygetan ratios journey through the beat over time |
-| **Dimensional Journey** | Cycles through all frequency sets | Activates sacred layers regardless of session length |
+| **Dimensional Journey** | 9 equal-duration phases through dimensions 1D–9D | Each dimension uses its own sacred-mathematics ratio set, modulation intensity, 13-voice spectral emphasis (subharmonics in low dimensions → upper PHI exponents in high), and sacred-layer emphasis (Water at 1D, Crystalline at 3D, Merkaba at 5D, Pleroma at 7D, Blue Ray at 9D). Smootherstep crossfades between adjacent dimensions. Sacred layers active regardless of session length. |
 
 ## The Seven Sacred Healing Layers
 
@@ -95,8 +96,28 @@ Every numerical constant in CrystalCare carries sacred intention. No arbitrary n
 | Taygetan Beat Drift | ±0.5 Hz over ~200s | Living rhythm via slow simplex-driven drift |
 | Taygetan Ratio Bias | (ratio − 1) × 0.02 | The 7 sacred Taygetan ratios bias the beat over the session as a temporal signature |
 | Taygetan Base Set | 432, 528, 963 Hz | Documented Taygetan carriers (Lemurian keynote, med-pod frequency, Solfeggio crown) |
+| Wave Shape (voices) | Triangle (default) | Triangle's odd harmonics at 432 Hz inherently contain Tesla 3-6-9 + Pythagorean 5 + Solfeggio crown — the sacred mathematics expressed in the waveform itself |
+| Wave Shape (exceptions) | Sine | Blue Ray (still axis — purity), Taygetan first 9 voices (binaural carriers — pure sines for clean L/R difference detection), all modulators |
+| Dimensional Phase Count | 9 | One phase per dimension (1D Foundation → 9D Source/Crown) |
+| Dimensional Crossfade | 15% of each phase | Smootherstep blend window into the next dimension |
 
 The entire sub-perceptual modulation system — breath, LFO, and spatial drift — descends from one root: Earth's Schumann resonance scaled through the PHI ladder. Seven sacred layers breathe as one unified organism: six along a PHI ladder rooted in Schumann (Blue Ray below Earth at PHI⁻¹, Water at the root, Archon/Crystalline/Solfeggio/Pleroma climbing in PHI quarter-steps), plus Merkaba at the HeartMath 0.1 Hz heart-coherence rate.
+
+### The Dimensional Journey (Mode 7)
+
+The 9-phase journey through dimensions 1D–9D maps each dimension to one of CrystalCare's nine ratio sets. Each dimension also has its own 13-voice spectral emphasis (the carrier's perceived center moves from subharmonics in the body-grounded low dimensions to upper PHI exponents in the crown-band high dimensions) and its own sacred-layer emphasis (the dominant layer shifts as the journey ascends).
+
+| Dimension | Ratio Set | Mod Index | Spectral Emphasis | Dominant Sacred Layer |
+|-----------|-----------|-----------|-------------------|----------------------|
+| **1D — Foundation / Earth** | `minimal` (Metatron √2) | 0.18 | Subharmonics (body grounding) | Water (Earth element) |
+| **2D — Etheric / Atlantean** | `fibonacci_set` (PHI ladder) | 0.20 | Lifting upward, subharmonics still strong | Water + Pleroma rising |
+| **3D — Heart / Body** | `triple_helix` (DNA 1.0/1.2/1.4) | 0.21 | Balanced full spectrum | Crystalline |
+| **4D — Emotional / Astral** | `flower_of_life` (1.3/1.5/2.5) | 0.22 | PHI exponents begin foreground | Silent Solfeggio Grid |
+| **5D — Light Body / Geometry** | `sacred_geometry` (Metatron/Vesica/hex/PHI/circle) | 0.23 | Upper PHI exponents prominent | Lemurian Merkaba |
+| **6D — Higher Mind** | `combined` (sacred + flower) | 0.24 | Upper PHI dominant | Archon Dissolution |
+| **7D — Soul / Causal** | `fractal_set` (transcendental π and e) | 0.25 | Upper PHI stronger, body voices quiet | Pleroma Mercy |
+| **8D — Galactic / Taygetan** | `taygetan` (Pleiadian) | 0.27 | PHI⁴ and PHI⁵ dominant | Pleroma + Blue Ray |
+| **9D — Source / Crown / All** | `all_blended` (every distinct ratio) | 0.30 | Highest PHI exponents fully foregrounded | Blue Ray (the still axis as crown) |
 
 ## The Law of One
 
@@ -168,7 +189,7 @@ Originally prototyped in Python (NumPy, Numba, wxPython), CrystalCare was rewrit
 
 ## Accessibility
 
-CrystalCare is fully screen-reader accessible. She uses WPF with a native Win32 TextBox for status messages (via WindowsFormsHost) for reliable navigation with NVDA and JAWS.
+CrystalCare is fully screen-reader accessible. She uses WPF with a native Win32 TextBox for status messages (via WindowsFormsHost) for reliable navigation with NVDA and JAWS. On launch, keyboard focus is set automatically to the **Select Frequency Set** combobox, so screen readers announce it immediately and arrow keys can begin browsing modes without tabbing. Control state changes use Enable/Disable + SetFocus rather than Show/Hide for screen-reader stability.
 
 ## License
 

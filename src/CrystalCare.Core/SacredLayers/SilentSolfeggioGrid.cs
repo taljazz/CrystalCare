@@ -1,3 +1,4 @@
+using CrystalCare.Core.Dsp;
 using CrystalCare.Core.Frequencies;
 
 namespace CrystalCare.Core.SacredLayers;
@@ -34,24 +35,29 @@ public sealed class SilentSolfeggioGrid : SacredLayerBase
     protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
-        // Solfeggio grid: sum of 12 solfeggio frequencies — double precision phase
+        // Solfeggio grid: sum of 12 Solfeggio voices as TRIANGLE waves —
+        // the waveform now matches the sacred mathematics. Each Solfeggio tone's
+        // triangle-wave overtones ring out the inherent 3/5/7/9 odd harmonics
+        // (Tesla 3-6-9 + Pythagorean 5) within the voice itself.
         var solfeggioGrid = new float[n];
         var solfeggio = SacredConstants.SOLFEGGIO;
         for (int s = 0; s < solfeggio.Length; s++)
         {
             double freq = solfeggio[s];
             for (int i = 0; i < n; i++)
-                solfeggioGrid[i] += (float)System.Math.Sin(SacredConstants.TWO_PI_D * freq * tChunk[i]);
+                solfeggioGrid[i] += WaveShapes.Triangle(SacredConstants.TWO_PI_D * freq * tChunk[i]);
         }
 
-        // Tesla 3-6-9 vortex grid — double precision phase
+        // Tesla 3-6-9 vortex grid — triangle especially fitting here. In vortex
+        // math, 3-6-9 forms the triangle that governs energy flow; triangle waves
+        // at each vortex frequency carry that geometric form into the waveform itself.
         var teslaGrid = new float[n];
         var tesla = SacredConstants.TESLA_VORTEX;
         for (int s = 0; s < tesla.Length; s++)
         {
             double freq = tesla[s];
             for (int i = 0; i < n; i++)
-                teslaGrid[i] += (float)System.Math.Sin(SacredConstants.TWO_PI_D * freq * tChunk[i]);
+                teslaGrid[i] += WaveShapes.Triangle(SacredConstants.TWO_PI_D * freq * tChunk[i]);
         }
 
         // Fibonacci amplitude (smooth sine modulation) — double precision
