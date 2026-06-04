@@ -1,4 +1,4 @@
-# CrystalCare — v5.0.0
+# CrystalCare — v5.1.0
 
 CrystalCare is a Lemurian-inspired sound healing instrument. She generates evolving, mathematically alive tones through a 16-stage audio pipeline rooted in sacred mathematics. Every session is unique; no two listening experiences are the same by design.
 
