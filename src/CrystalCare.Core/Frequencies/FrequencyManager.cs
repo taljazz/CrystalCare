@@ -71,10 +71,28 @@ public sealed class FrequencyManager
     // for less common sets. Ensures variety with controlled distribution.
     #region Weighted Random Selection
 
-    // Weighted probability distribution for random selection
+    // Weighted probability distribution for random selection. Weights are keyed
+    // BY NAME and resolved against RatioSets' key order at class initialization —
+    // previously they were a bare positional array, so reordering the RatioSets
+    // dictionary initializer would have silently reassigned every weight. A
+    // missing or misspelled name now fails fast at startup instead. Values are
+    // unchanged: sacred_geometry is most likely (0.25), fractal_set rarest (0.05).
+    private static readonly Dictionary<string, float> RatioSetWeightByName = new()
+    {
+        ["sacred_geometry"] = 0.25f,
+        ["flower_of_life"] = 0.15f,
+        ["triple_helix"] = 0.12f,
+        ["combined"] = 0.10f,
+        ["minimal"] = 0.08f,
+        ["enhanced_geometry"] = 0.07f,
+        ["fibonacci_set"] = 0.06f,
+        ["fractal_set"] = 0.05f,
+        ["taygetan"] = 0.12f,
+    };
+
     private static readonly string[] RatioSetNames = RatioSets.Keys.ToArray();
     private static readonly float[] RatioSetWeights = NormalizeWeights(
-        [0.25f, 0.15f, 0.12f, 0.10f, 0.08f, 0.07f, 0.06f, 0.05f, 0.12f]);
+        RatioSetNames.Select(name => RatioSetWeightByName[name]).ToArray());
 
     /// <summary>
     /// Multiply base frequency by each ratio in the set.

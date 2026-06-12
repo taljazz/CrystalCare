@@ -12,7 +12,6 @@ using CrystalCare.Core.Generation;
 using Microsoft.Win32;
 using NAudio.CoreAudioApi;
 using NAudio.CoreAudioApi.Interfaces;
-using NAudio.Wave;
 
 namespace CrystalCare;
 
@@ -45,10 +44,17 @@ public partial class MainWindow : Window, IMMNotificationClient
     // (NVDA, JAWS) can navigate this with arrow keys, unlike WPF's LiveRegion
     private readonly System.Windows.Forms.TextBox _statusTextBox;
 
-    // MMDevice enumerator for real-time audio device notifications.
+    // MMDevice enumerator for device listing AND real-time device notifications.
     // Windows pushes device state change events through this, letting us
     // update the dropdown instantly when a device is added, removed, or disabled.
     private readonly MMDeviceEnumerator _deviceEnumerator = new();
+
+    // WASAPI endpoint IDs parallel to the device dropdown's items (offset by
+    // one — index 0 of the dropdown is "Default Output Device", which has no
+    // entry here). Selection is resolved to an ID, not a positional device
+    // number, so the right endpoint is used even if the device order shifts
+    // between enumeration and Play.
+    private readonly List<string> _deviceIds = new();
 
     #endregion
 
@@ -137,12 +143,12 @@ public partial class MainWindow : Window, IMMNotificationClient
         try
         {
             // Stream audio in real-time — constant memory regardless of duration.
-            // Pass the selected output device number for playback.
+            // Pass the selected output device's WASAPI endpoint ID for playback.
             await _soundPlayer.PlayStreamAsync(
                 duration * 60f, baseFreq, 48000, _cts.Token,
                 updateStatus: UpdateStatus,
                 freqMode: mode,
-                deviceNumber: GetSelectedDeviceNumber());
+                deviceId: GetSelectedDeviceId());
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -415,8 +421,10 @@ public partial class MainWindow : Window, IMMNotificationClient
 
     /// <summary>
     /// Populate the output device dropdown with all available audio output devices.
-    /// Uses NAudio's WaveOut.GetCapabilities to enumerate devices.
-    /// Device -1 is the system default (Windows Sound Mapper).
+    /// Enumerates active WASAPI render endpoints via MMDeviceEnumerator — full
+    /// friendly names (the previous WinMM WaveOut.GetCapabilities truncated
+    /// ProductName to 31 characters, which could make similar devices
+    /// indistinguishable on a screen reader). Index 0 is the system default.
     /// Preserves the currently selected device by name if it still exists.
     /// </summary>
     private void PopulateDeviceList()
@@ -425,15 +433,21 @@ public partial class MainWindow : Window, IMMNotificationClient
         string? previousSelection = DeviceChoice.SelectedItem as string;
 
         DeviceChoice.Items.Clear();
+        _deviceIds.Clear();
 
-        // Add the default device first (Windows Sound Mapper, device -1)
+        // Add the default device first (resolved to the actual default endpoint
+        // at Play time, so it tracks Windows' default even if it changes)
         DeviceChoice.Items.Add("Default Output Device");
 
-        // Enumerate all currently available output devices
-        for (int i = 0; i < WaveOut.DeviceCount; i++)
+        // Enumerate all active render endpoints with their full friendly names,
+        // remembering each endpoint's ID for exact resolution at Play time.
+        // MMDevice wraps COM resources — dispose each after reading.
+        foreach (var device in _deviceEnumerator.EnumerateAudioEndPoints(
+            DataFlow.Render, DeviceState.Active))
         {
-            var caps = WaveOut.GetCapabilities(i);
-            DeviceChoice.Items.Add(caps.ProductName);
+            DeviceChoice.Items.Add(device.FriendlyName);
+            _deviceIds.Add(device.ID);
+            device.Dispose();
         }
 
         // Try to restore the previous selection by name; fall back to default
@@ -466,15 +480,18 @@ public partial class MainWindow : Window, IMMNotificationClient
     }
 
     /// <summary>
-    /// Get the NAudio device number for the selected output device.
-    /// Returns -1 for the default device, or 0-based index for specific devices.
+    /// Get the WASAPI endpoint ID for the selected output device.
+    /// Returns null for the default device (resolved at Play time so it tracks
+    /// Windows' current default), or the endpoint ID for a specific device.
     /// </summary>
-    private int GetSelectedDeviceNumber()
+    private string? GetSelectedDeviceId()
     {
-        // Index 0 = "Default Output Device" = NAudio device -1
-        // Index 1+ = specific devices = NAudio device 0+
+        // Index 0 = "Default Output Device" = null (system default)
+        // Index 1+ = specific devices, offset by one into _deviceIds
         int selected = DeviceChoice.SelectedIndex;
-        return selected <= 0 ? -1 : selected - 1;
+        return selected <= 0 || selected - 1 >= _deviceIds.Count
+            ? null
+            : _deviceIds[selected - 1];
     }
 
     /// <summary>

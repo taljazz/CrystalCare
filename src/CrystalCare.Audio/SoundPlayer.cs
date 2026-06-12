@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using CrystalCare.Core.Frequencies;
 using CrystalCare.Core.Generation;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace CrystalCare.Audio;
@@ -39,12 +40,19 @@ public sealed class SoundPlayer : IDisposable
     /// Stream audio to speakers using producer-consumer pattern.
     /// Audio starts playing as soon as the first chunk is generated (~0.2s).
     /// </summary>
+    /// <param name="deviceId">
+    /// WASAPI endpoint ID of the output device, or null for the system default.
+    /// IDs come from MMDeviceEnumerator (the same API the GUI uses to list
+    /// devices with full friendly names — WinMM device numbers truncated names
+    /// to 31 characters, which made similar devices indistinguishable on a
+    /// screen reader).
+    /// </param>
     public async Task PlayStreamAsync(float duration, float baseFreq,
         int sampleRate, CancellationToken ct,
         Action<string>? updateStatus = null,
         Action<float>? updateProgress = null,
         FrequencyMode freqMode = FrequencyMode.Standard,
-        int deviceNumber = -1)
+        string? deviceId = null)
     {
         var chunkQueue = new BlockingCollection<float[,]>(boundedCapacity: 4);
 
@@ -76,14 +84,37 @@ public sealed class SoundPlayer : IDisposable
         // Consumer: NAudio playback
         var provider = new StreamingWaveProvider(chunkQueue, sampleRate, ct);
 
+        MMDevice? device = null;
         try
         {
-            _waveOut = new WaveOutEvent
+            // Resolve the output endpoint via WASAPI. A specific device is
+            // looked up by its endpoint ID; null means the system default.
+            // If a previously selected device has vanished (unplugged between
+            // selection and Play), fall back to the default and say so rather
+            // than failing the session.
+            using (var enumerator = new MMDeviceEnumerator())
             {
-                DeviceNumber = deviceNumber,
-                DesiredLatency = 200,
-                NumberOfBuffers = 3,
-            };
+                if (deviceId != null)
+                {
+                    try
+                    {
+                        device = enumerator.GetDevice(deviceId);
+                    }
+                    catch
+                    {
+                        updateStatus?.Invoke(
+                            "Selected output device is unavailable — using the default device.");
+                    }
+                }
+                device ??= enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            }
+
+            // WASAPI shared-mode output (replaces WaveOutEvent so playback and
+            // the GUI's device list speak the same API and full device names).
+            // Shared mode mixes through Windows exactly as WinMM ultimately did;
+            // 200 ms latency matches the previous WaveOutEvent setting.
+            _waveOut = new WasapiOut(device, AudioClientShareMode.Shared,
+                useEventSync: true, latency: 200);
             _waveOut.Init(provider);
             _waveOut.Play();
 
@@ -105,6 +136,9 @@ public sealed class SoundPlayer : IDisposable
             _waveOut?.Stop();
             _waveOut?.Dispose();
             _waveOut = null;
+
+            // Release the WASAPI endpoint's COM resources
+            device?.Dispose();
         }
     }
 
