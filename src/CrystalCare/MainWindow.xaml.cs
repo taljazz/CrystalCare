@@ -82,11 +82,13 @@ public partial class MainWindow : Window, IMMNotificationClient
         // Create the sound player that wraps NAudio for playback and saving
         _soundPlayer = new SoundPlayer(_soundGenerator);
 
-        // Enable diagnostic logging by default — user explicitly requested this
-        // for diagnosing Taygetan-mode dissonance. Each Play/Save creates a
-        // timestamped log in %TEMP%/CrystalCare-diag-*.log. Set to false here
-        // (or via property) once the diagnosis is complete.
-        DiagnosticLogger.IsEnabled = true;
+        // Diagnostic logging is OPT-IN (default off). The Taygetan dissonance
+        // diagnosis that needed always-on logging completed in v5.0.0 — leaving
+        // it on wrote a log file to %TEMP% for every Play/Save forever and spent
+        // per-chunk signal scans on sessions that didn't need them. Flip this to
+        // true (and rebuild) when a session needs to be captured for analysis;
+        // every log call is a cheap no-op while it stays false.
+        DiagnosticLogger.IsEnabled = false;
 
         // Populate the output device dropdown with all available audio devices
         PopulateDeviceList();
@@ -153,10 +155,16 @@ public partial class MainWindow : Window, IMMNotificationClient
             {
                 ToggleControls(isPlaying: false);
 
-                // Named modes get personalized completion messages
-                string msg = mode is FrequencyMode.TripleHelixDna or FrequencyMode.TaygetanBinaural or FrequencyMode.DimensionalShift
-                    ? $"{GetModeName(mode)} completed."
-                    : "Playback completed.";
+                // Honest completion message: a session the user stopped reports
+                // "stopped", not "completed" (the Save path already had this
+                // guard; the Play path used to claim completion after a Stop).
+                // Named modes get personalized completion messages.
+                bool wasCancelled = _cts?.IsCancellationRequested ?? false;
+                string msg = wasCancelled
+                    ? "Playback stopped."
+                    : mode is FrequencyMode.TripleHelixDna or FrequencyMode.TaygetanBinaural or FrequencyMode.DimensionalShift
+                        ? $"{GetModeName(mode)} completed."
+                        : "Playback completed.";
                 UpdateStatus(msg);
             }
         }
@@ -538,7 +546,10 @@ public partial class MainWindow : Window, IMMNotificationClient
     {
         bool isIdle = !isPlaying;
 
-        // Enable/disable all input controls
+        // Enable/disable all input controls. The Stop button stays VISIBLE at
+        // all times and only toggles IsEnabled — the screen-reader rule for this
+        // app is Enable/Disable + focus, never Show/Hide, so the control's
+        // position in the accessibility tree never shifts under the user.
         FreqChoice.IsEnabled = isIdle;
         DeviceChoice.IsEnabled = isIdle;
         DurationText.IsEnabled = isIdle;
@@ -548,13 +559,8 @@ public partial class MainWindow : Window, IMMNotificationClient
         BatchSaveBtn.IsEnabled = isIdle;
         StopBtn.IsEnabled = isPlaying;
 
-        // Show/collapse stop button
-        if (isPlaying)
-            StopBtn.Visibility = Visibility.Visible;
-        else
-            StopBtn.Visibility = Visibility.Collapsed;
-
-        // Show/collapse progress gauge
+        // Show/collapse progress gauge (an indicator, not an interactive
+        // control — visibility toggling is fine here)
         if (showGauge)
         {
             Gauge.Value = 0;
@@ -606,14 +612,9 @@ public partial class MainWindow : Window, IMMNotificationClient
 
     /// <summary>
     /// Validate and parse the duration text field.
-    /// Must be a positive number no greater than 60 minutes.
-    /// Returns false and shows an error if invalid.
-    /// </summary>
-    /// <summary>
-    /// Validate and parse the duration text field.
     /// Accepts flexible formats and returns duration in minutes.
     /// The 60-minute cap applies only to save operations (RAM-bound);
-    /// streaming playback is unlimited.
+    /// streaming playback supports up to 12 hours per session.
     /// </summary>
     private bool ValidateAndParseDuration(out float duration, bool allowUnlimited = false)
     {
@@ -635,11 +636,23 @@ public partial class MainWindow : Window, IMMNotificationClient
             return false;
         }
 
+        // Streaming ceiling: the pipeline indexes samples with int32, whose
+        // ceiling at 48 kHz is ~12.4 hours — beyond that the sample count
+        // overflows and the session would silently produce nothing. Cap at a
+        // clean 12 hours and say so honestly. (For longer room-protection
+        // fields, restart her — each session is unique by design anyway.)
+        const float maxStreamingMinutes = 12f * 60f;
+        if (allowUnlimited && duration > maxStreamingMinutes)
+        {
+            UpdateStatus("Error: Streaming sessions support up to 12 hours. For longer coverage, start a fresh session — every session she sings is unique.");
+            DurationText.Focus();
+            return false;
+        }
+
         // Only enforce the 60-minute cap for save/batch operations (RAM-bound).
-        // Streaming playback has no RAM limit — any length is supported.
         if (!allowUnlimited && duration > 60)
         {
-            UpdateStatus("Error: Duration must be <= 60 minutes for saves. Streaming playback is unlimited.");
+            UpdateStatus("Error: Duration must be <= 60 minutes for saves. Streaming playback supports up to 12 hours.");
             DurationText.Focus();
             return false;
         }

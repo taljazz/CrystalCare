@@ -37,7 +37,7 @@ public sealed class ArchonDissolutionLayer : SacredLayerBase
     protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
-        var simplex = Simplex.Value!;
+        var simplex = Simplex;
         var archonFreqs = SacredConstants.ARCHON_SPHERES;
         var pentPhases = SacredConstants.PENTAGONAL_PHASES;
         int nArchons = archonFreqs.Length;

@@ -141,7 +141,14 @@ public sealed class FrequencyManager
     private static FrequencyResult CreateTaygetanBinaural(float baseFreq)
     {
         // Sacred Taygetan binaural sync beat — see SacredConstants.TAYGETAN_BEAT
-        // (7.3 Hz, channeled Pleiadian transmission inside the Schumann window).
+        // (7.7 Hz, the community-documented Pleiadian carrier inside the
+        // Schumann window).
+        //
+        // NOTE: these pairs are no longer used for tone formation. Stage 6 weaves
+        // the binaural directly through the standard 13-voice harmonic field via
+        // a ±beat/2 L/R split (see SoundGenerator.Taygetan.cs). The pair table
+        // remains for the diagnostic reference log at session start and for the
+        // Save/BatchSave "frequencies exist" guard in MainWindow.
         const float delta = SacredConstants.TAYGETAN_BEAT;
 
         var tayRatios = RatioSets["taygetan"];

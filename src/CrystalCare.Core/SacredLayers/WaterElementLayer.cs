@@ -40,7 +40,7 @@ public sealed class WaterElementLayer : SacredLayerBase
     protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
-        var simplex = Simplex.Value!;
+        var simplex = Simplex;
 
         // Simplex perturbation for organic observer drift — scaled time stays small
         var tScaled = new float[n];

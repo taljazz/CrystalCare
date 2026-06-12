@@ -106,28 +106,50 @@ public static class RosslerAttractor
 
     #endregion
 
-    // Binary search + linear interpolation to look up trajectory values at
-    // arbitrary time points. Used by the pipeline to get chaos values at each sample.
+    // Cursor-based linear interpolation to look up trajectory values at
+    // monotonically increasing time points. Used by the pipeline to get chaos
+    // values at each sample.
+    //
+    // The pipeline queries time in strictly ascending order within a chunk, so
+    // a walking cursor (`hint`) replaces the previous per-sample binary search:
+    // the bracketing interval advances at most a step or two per sample, making
+    // each lookup O(1) instead of O(log n). The bracket found is the same one
+    // binary search found (last index with trajTimes[i] <= time), so the
+    // interpolated output is bit-identical.
     #region Interpolation
 
-    public static float Interpolate(float[] trajValues, float[] trajTimes, float time)
+    /// <summary>
+    /// Interpolate the trajectory at the given time, using and updating a
+    /// caller-held cursor. Initialize the cursor to 0 at the start of each
+    /// chunk; pass the same variable for every sample of the chunk so the
+    /// bracket walks forward instead of re-searching.
+    /// </summary>
+    /// <param name="hint">
+    /// Bracketing-interval cursor. In: where to start walking. Out: the interval
+    /// containing this time (reusable for the next, later, time value).
+    /// </param>
+    public static float Interpolate(float[] trajValues, float[] trajTimes, float time,
+        ref int hint)
     {
         if (trajTimes.Length == 0) return 0f;
-        if (time <= trajTimes[0]) return trajValues[0];
-        if (time >= trajTimes[^1]) return trajValues[^1];
+        if (time <= trajTimes[0]) { hint = 0; return trajValues[0]; }
+        if (time >= trajTimes[^1]) { hint = trajTimes.Length - 2; return trajValues[^1]; }
 
-        // Binary search for the bracketing interval
-        int lo = 0, hi = trajTimes.Length - 1;
-        while (hi - lo > 1)
-        {
-            int mid = (lo + hi) / 2;
-            if (trajTimes[mid] <= time) lo = mid;
-            else hi = mid;
-        }
+        // Clamp the cursor into the valid interval range
+        if (hint < 0) hint = 0;
+        if (hint > trajTimes.Length - 2) hint = trajTimes.Length - 2;
 
-        // Linear interpolation
-        float frac = (time - trajTimes[lo]) / (trajTimes[hi] - trajTimes[lo]);
-        return trajValues[lo] + frac * (trajValues[hi] - trajValues[lo]);
+        // Walk backward if the cursor overshot (defensive — time is monotonic
+        // in the pipeline so this loop almost never runs)
+        while (hint > 0 && trajTimes[hint] > time) hint--;
+
+        // Advance forward to the bracketing interval: the last index with
+        // trajTimes[hint] <= time — the same bracket binary search produced
+        while (hint < trajTimes.Length - 2 && trajTimes[hint + 1] <= time) hint++;
+
+        // Linear interpolation within the bracket
+        float frac = (time - trajTimes[hint]) / (trajTimes[hint + 1] - trajTimes[hint]);
+        return trajValues[hint] + frac * (trajValues[hint + 1] - trajValues[hint]);
     }
 
     #endregion

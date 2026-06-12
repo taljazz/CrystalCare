@@ -17,10 +17,18 @@ public sealed class StreamingReverb
     // Impulse response (IR) and overlap tail buffer.
     // IR: 2.618 seconds (PHI² duration) with exponential decay + PHI sinusoidal modulation.
     // Tail buffer carries reverb spillover between chunks for seamless continuity.
+    // The IR's forward FFT is cached after the first chunk (the IR never changes
+    // during a session) — re-computing it per chunk was a third of all reverb CPU.
     #region Fields and Constructor
 
     private readonly float[] _ir;        // Pre-computed impulse response
     private float[] _tail;               // Overlap tail carried between chunks
+
+    // Cached forward FFT of the IR, built lazily on the first ProcessChunk call
+    // (sized from the first chunk's length — the largest the stream produces;
+    // later chunks are the same length or shorter, never longer). Rebuilt only
+    // if a larger chunk ever arrives.
+    private System.Numerics.Complex[]? _kernelFft;
 
     public StreamingReverb(int sampleRate = 48000)
     {
@@ -70,8 +78,17 @@ public sealed class StreamingReverb
     {
         int sigLen = chunk.Length;
 
-        // FFT convolve: output length = sigLen + irLen - 1
-        var fullOutput = FftConvolution.Convolve(chunk, _ir);
+        // FFT convolve: output length = sigLen + irLen - 1.
+        // The IR's forward FFT is computed once and cached — only the signal
+        // side is FFT'd per chunk. Cache is sized from the largest chunk seen
+        // (the first full 3-second chunk); the final shorter chunk of a session
+        // reuses the same FFT size, which is exact for linear convolution.
+        int resultLen = sigLen + _ir.Length - 1;
+        int neededFftLen = FftConvolution.NextPowerOf2(resultLen);
+        if (_kernelFft == null || neededFftLen > _kernelFft.Length)
+            _kernelFft = FftConvolution.PrepareKernel(_ir, neededFftLen);
+
+        var fullOutput = FftConvolution.ConvolveWithPreparedKernel(chunk, _kernelFft, resultLen);
 
         // Overlap-add: add previous tail to beginning of output
         int tailAdd = global::System.Math.Min(_tail.Length, fullOutput.Length);

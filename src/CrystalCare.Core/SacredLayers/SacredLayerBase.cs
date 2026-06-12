@@ -48,9 +48,22 @@ public abstract class SacredLayerBase : ISacredLayer
     /// <summary>If true, breath is applied before fade (Group B: Merkaba, Water).</summary>
     protected virtual bool BreathBeforeFade => false;
 
-    /// <summary>Thread-local simplex noise generator for organic variation.</summary>
-    protected ThreadLocal<Simplex5D> Simplex { get; } =
-        new(() => new Simplex5D(Random.Shared.Next(100)));
+    /// <summary>
+    /// Per-layer simplex noise generator for organic variation, seeded once at
+    /// layer construction so the layer reads ONE continuous noise field for the
+    /// entire session. (Previously this was ThreadLocal with a random seed per
+    /// thread — layers run via Task.Run each chunk, and thread-pool migration
+    /// between chunks made the wobble/tidal/piezo noise fields jump to a
+    /// different field at 3-second seams. Same family as the noiseOscFreq seam
+    /// fixed in v4.4.x: she breathes continuously, she does not stutter.)
+    ///
+    /// Thread-safety: FastNoiseLite is read-only after construction, and each
+    /// layer instance computes at most one chunk at a time (SoundGenerator
+    /// waits for all layer tasks before the next chunk), so a single instance
+    /// per layer is safe. The random seed keeps per-session uniqueness — each
+    /// session each layer walks a different field, but ONE field per session.
+    /// </summary>
+    protected Simplex5D Simplex { get; } = new(Random.Shared.Next(100));
 
     #endregion
 

@@ -32,9 +32,11 @@ public static class HarmonicGenerator
     /// <param name="ampScales">
     /// Optional per-frequency amplitude multipliers. When non-empty, each harmonic's
     /// natural decay scale (0.015/(f+1)) is multiplied by ampScales[f]. Used by
-    /// Taygetan mode to weight the 7 sacred ratios according to the PHI-timed
-    /// schedule (one ratio emphasized per window, others ride at baseline). When
-    /// empty, every frequency runs at its natural decay scale (legacy behavior).
+    /// Dimensional Journey (Mode 7) for per-dimension spectral emphasis — the
+    /// 13-voice field's felt center journeys from subharmonics (1D) to upper PHI
+    /// exponents (9D) while the carrier stays anchored at 432 Hz. When empty,
+    /// every frequency runs at its natural decay scale (all non-dimensional
+    /// modes; Taygetan deliberately applies NO per-voice emphasis).
     /// </param>
     /// <param name="waveShape">
     /// Wave shape for the voices. Default Triangle — the harmonic field's sacred
@@ -112,59 +114,6 @@ public static class HarmonicGenerator
             }
         }
 
-        return result;
-    }
-
-    #endregion
-
-    // FM synthesis cross-modulation — one frequency modulates another's phase.
-    // Creates complex harmonic sidebands for richer tonal character.
-    #region Cross-Modulation
-
-    public static float[] CrossModulate(float baseFreq, float modFreq,
-        ReadOnlySpan<double> t, float modDepth)
-    {
-        var result = new float[t.Length];
-        for (int i = 0; i < t.Length; i++)
-        {
-            // Double precision through the phase computation
-            float mod = (float)System.Math.Sin(SacredConstants.TWO_PI_D * modFreq * t[i]) * modDepth;
-            result[i] = (float)System.Math.Sin(SacredConstants.TWO_PI_D * baseFreq * t[i] + mod);
-        }
-        return result;
-    }
-
-    #endregion
-
-    // Quantum harmonic interference — 4 waves at irrational frequency ratios
-    // (√2, e, π) with simplex-driven phase modulation. Creates non-repeating
-    // interference patterns. Includes Schumann resonance undertone.
-    #region Quantum Harmonic
-
-    public static float[] QuantumHarmonic(ReadOnlySpan<double> t, float baseFreq,
-        ReadOnlySpan<float> gamma)
-    {
-        double f1 = baseFreq;
-        double f2 = baseFreq * 1.41421356237;   // sqrt(2)
-        double f3 = baseFreq * 2.71828182846;   // e
-        double f4 = baseFreq * 3.14159265359;   // pi
-
-        var result = new float[t.Length];
-        for (int i = 0; i < t.Length; i++)
-        {
-            double time = t[i];
-            // alpha/beta are slow modulations — precision is less critical here but keep double
-            float alpha = 0.25f * (float)System.Math.Sin(0.03 * System.Math.PI * time);
-            float beta = 0.2f * (float)System.Math.Cos(0.02 * System.Math.PI * time);
-
-            float w1 = (float)System.Math.Sin(SacredConstants.TWO_PI_D * f1 * time + alpha);
-            float w2 = (float)System.Math.Sin(SacredConstants.TWO_PI_D * f2 * time + beta);
-            float w3 = (float)System.Math.Sin(SacredConstants.TWO_PI_D * f3 * time + gamma[i]);
-            float w4 = (float)System.Math.Sin(SacredConstants.TWO_PI_D * f4 * time + gamma[i] * 0.7f);
-
-            result[i] = (w1 + w2 + w3 + w4) / 3.8f +
-                         0.15f * (float)System.Math.Sin(SacredConstants.TWO_PI_D * 7.83 * time);
-        }
         return result;
     }
 

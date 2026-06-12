@@ -51,7 +51,7 @@ public sealed class CrystallineResonanceLayer : SacredLayerBase
     protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
-        var simplex = Simplex.Value!;
+        var simplex = Simplex;
         var profiles = _crystalLib.Profiles;
         int numProfiles = profiles.Length;
 

@@ -239,21 +239,19 @@ public sealed partial class SoundGenerator
 
     /// <summary>
     /// Estimate normalization gain by generating a short test signal.
-    /// Runs harmonics (and optionally Taygetan binaural overlay) through wave shaping
-    /// at full envelope to find the peak, then returns 1/(peak × NormalizationHeadroom)
+    /// Runs the standard 13-voice harmonic field through wave shaping at full
+    /// envelope to find the peak, then returns 1/(peak × NormalizationHeadroom)
     /// — the headroom is configurable on SoundGenerator (default PHI^0.75 for ~0.689
     /// post-norm peak; was PHI for ~0.618).
+    ///
+    /// The same estimate holds for every mode: Taygetan's binaural L/R split
+    /// (±beat/2 per voice) doesn't change per-voice amplitudes, and Dimensional
+    /// Journey's per-dimension amp scales always sum at or below the baseline
+    /// field (verified across all 9 dimensions), so the mono full-field test
+    /// signal is the worst case.
     /// </summary>
-    /// <param name="binauralPairs">
-    /// Optional Stage 7 Taygetan binaural pairs. When non-null, each pair is synthesized
-    /// into the test signal at the SAME envelope × 0.015 mix scale used in the runtime
-    /// pipeline, so the peak estimate reflects the actual amplitude reaching Stage 8/10.
-    /// Passing null preserves the original harmonic-only test (correct for Modes 0–4
-    /// and Dimensional, since they don't activate Stage 7 binaural injection).
-    /// </param>
     private float EstimateNormGain(float[] frequencies, float[] modDepths,
-        MicrotonalLfo.LfoParams lfoParams, int sampleRate,
-        (float Left, float Right)[]? binauralPairs = null)
+        MicrotonalLfo.LfoParams lfoParams, int sampleRate)
     {
         // Generate a half-second test signal starting at the LFO quarter-period (peak)
         int estSamples = global::System.Math.Min(sampleRate / 2, 24000);
@@ -277,20 +275,9 @@ public sealed partial class SoundGenerator
         var estWave = HarmonicGenerator.GenerateHarmonics(estT, frequencies, estEnv, estLfo, modDepths,
             waveShape: WaveShape.Triangle);
 
-        // Stage 7 simulation — REMOVED in Path 4+ architecture. The Taygetan
-        // binaural sync is now woven directly through the Stage 6 harmonic field
-        // (separate L/R freq arrays per voice, schedule-driven amp scaling).
-        // The test signal already reflects the Taygetan tone formation because
-        // it was generated from `frequencies` (which is the Taygetan freq set
-        // when Taygetan mode is active) by the call above.
-        //
-        // The `binauralPairs` parameter is kept for API compatibility but no
-        // longer needed for amplitude estimation — peak comes naturally from
-        // the harmonic-field test signal. The breath peak (1 + 50%) is implicit
-        // because we test at the LFO quarter-period (LFO peak); breath cycle
-        // is similar magnitude. Real-world peak should fit comfortably under
-        // the post-norm target.
-        _ = binauralPairs;  // intentionally unused; preserved in signature
+        // The breath peak (1 + 50%) is implicit because we test at the LFO
+        // quarter-period (LFO peak); breath cycle is similar magnitude.
+        // Real-world peak should fit comfortably under the post-norm target.
 
         // Wave-shape the same drive (2.5) used in runtime Stage 8 — saturation matters
         // for peak measurement because tanh limits peaks regardless of input amplitude.

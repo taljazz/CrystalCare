@@ -40,7 +40,7 @@ public sealed class LemurianMerkabaLayer : SacredLayerBase
     protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
-        var simplex = Simplex.Value!;
+        var simplex = Simplex;
 
         // Organic phase wobble from simplex noise — scaled time stays small for float
         var tScaled = new float[n];

@@ -37,7 +37,7 @@
                       AutomationProperties.Name="Session Duration">
                 <TextBox x:Name="DurationText" Margin="10"
                          AutomationProperties.Name="Session duration"
-                         ToolTip="Enter duration in flexible formats: 90 = 90 minutes, 1h30m = 1 hour 30 minutes, 1:30 = 1 hour 30 minutes, 2h = 2 hours, 30s = 30 seconds. Streaming is unlimited; saves are capped at 60 minutes." />
+                         ToolTip="Enter duration in flexible formats: 90 = 90 minutes, 1h30m = 1 hour 30 minutes, 1:30 = 1 hour 30 minutes, 2h = 2 hours, 30s = 30 seconds. Streaming supports up to 12 hours per session; saves are capped at 60 minutes." />
             </GroupBox>
 
             <!-- Output Device Selection -->

@@ -21,7 +21,7 @@ public sealed partial class SoundGenerator
     // CrystalProfileLibrary holds the 9 crystal harmonic profiles (Raman spectroscopy data).
     // ChaoticSelector produces logistic-map chaos for organic frequency variation.
     // MasterVolume (0.55 — the 10th Fibonacci number) is applied after all processing.
-    // PhaseModulationScale (default 0.0005) wires Stage 2 fractal variation into Stage 6
+    // PhaseModulationScale (default 0.001) wires Stage 2 fractal variation into Stage 6
     //     as sub-perceptual organic phase drift on every carrier — set to 0 for legacy sound.
     // ScheduleModulationScale (default PHI²) folds the Stage 1 Fibonacci-cycling sacred
     //     geometry schedule into the same phase modulation source — adds stepped macro
@@ -57,12 +57,10 @@ public sealed partial class SoundGenerator
     // never delivered: the simplex-driven pitch field now reaches the audio path.
     //
     // 0      = disabled (legacy behavior, matches all prior versions for A/B test)
-    // 0.0005 = default, at the threshold of audibility — very gentle
-    // 0.001  = clearly subtle, organic shimmer felt rather than heard
+    // 0.0005 = at the threshold of audibility — very gentle
+    // 0.001  = default — clearly subtle, organic shimmer felt rather than heard
     // 0.005  = noticeable macro-evolution, audible carrier breath
     // 0.01+  = pronounced FM character — diverges from "sub-perceptual"
-    //
-    // Start at 0.0005 and dial up if she still feels static.
     public float PhaseModulationScale { get; set; } = 0.001f;
 
     // Schedule modulation scale — folds the Stage 1 Fibonacci-cycling sacred-geometry
@@ -174,7 +172,11 @@ public sealed partial class SoundGenerator
 
         // Dimensional Shift mode activates sacred layers regardless of duration
         bool dimensionalMode = freqMode == FrequencyMode.DimensionalShift;
-        int totalSamples = (int)(sampleRate * duration);
+        // Compute total samples in double — float32 multiply loses sample-level
+        // precision above ~6 hours (ulp at 1e9 is 64+ samples). The GUI caps
+        // streaming at 12 hours so the int32 sample index never overflows
+        // (the ceiling at 48 kHz is ~12.4 hours; see ValidateAndParseDuration).
+        int totalSamples = (int)((double)sampleRate * duration);
         int chunkSize = 3 * sampleRate; // 3-second chunks (144,000 samples at 48kHz)
 
         // Diagnostic capture — when DiagnosticLogger.IsEnabled is false the calls
@@ -305,20 +307,22 @@ public sealed partial class SoundGenerator
         var simplexTorusDrift = new Simplex5D(55);  // Torus theta/phi phase drift (Fibonacci, slow session-level)
         var simplexTaygetanBeat = new Simplex5D(89); // Taygetan beat-frequency drift (Fibonacci, ~minutes period)
 
-        // Check if Taygetan binaural mode is active — requires stereo frequency pairs
+        // Check if Taygetan binaural mode is active. The ratio-pair table from
+        // FrequencyManager is DIAGNOSTICS ONLY — tone formation does not use it.
+        // The binaural lives inside Stage 6 as a ±beat/2 L/R split of the
+        // standard 13-voice harmonic field (see SoundGenerator.Taygetan.cs).
         bool hasTaygetan = freqMode == FrequencyMode.TaygetanBinaural;
         var tayFreqResult = hasTaygetan ? _frequencyManager.GetFrequencies(FrequencyMode.TaygetanBinaural) : null;
         var tayPairs = tayFreqResult?.BinauralPairs;
 
-        // For Taygetan mode, log the binaural pairs in full — every L/R/center/beat.
-        // Pairs are computed at the FrequencyManager's default base (432 Hz);
-        // the session baseFreq is also 432 (anchored for Taygetan), so harmonics
-        // and pairs share a fundamental.
+        // For Taygetan mode, log the legacy ratio-pair table as a readable
+        // reference of ratio-derived carriers (computed at the FrequencyManager's
+        // default 432 Hz base) for comparison against the Stage 6 voice table.
         if (hasTaygetan && tayPairs != null)
         {
-            DiagnosticLogger.LogSection("Taygetan binaural pairs (Stage 7 carriers)");
+            DiagnosticLogger.LogSection("Taygetan ratio-pair reference (diagnostics only — Stage 6 weaves the binaural)");
             DiagnosticLogger.Log($"NOTE: pairs are built at FrequencyManager default base (432 Hz)");
-            DiagnosticLogger.Log($"      session baseFreq = {baseFreq:F3} Hz (anchored to 432 for Taygetan)");
+            DiagnosticLogger.Log($"      session baseFreq = {baseFreq:F3} Hz (may be 432/528/963 for Taygetan)");
             DiagnosticLogger.LogPairs("tayPairs", tayPairs);
         }
 
@@ -514,11 +518,12 @@ public sealed partial class SoundGenerator
         #endregion
 
         // Estimate peak amplitude for normalization (prevents clipping).
-        // For Taygetan mode, pass tayPairs so the test signal includes the Stage 7
-        // binaural overlay — without this, the harmonic-only estimate is ~30× too
-        // quiet and normGain ends up clipping the audio severely (see fix log).
+        // The test signal is the same standard 13-voice field every mode uses
+        // for Stage 6 tone formation, at full envelope + LFO peak, through the
+        // same Stage 8 wave shaping. Taygetan's L/R split and Dimensional's
+        // amp scales never exceed this baseline, so one estimate serves all modes.
         float normGain = EstimateNormGain(allFrequencies, modDepths, lfoLeftParams,
-            sampleRate, hasTaygetan ? tayPairs : null);
+            sampleRate);
 
         // Log the normalization gain — high values (>3) indicate the test signal
         // was very quiet (peak was small); low values (<0.3) mean the signal needed
@@ -891,7 +896,15 @@ public sealed partial class SoundGenerator
                 {
                     Task.WaitAll(sacredTasks, TimeSpan.FromSeconds(60));
                 }
-                catch (AggregateException) { }
+                catch (AggregateException ex)
+                {
+                    // A crashed sacred layer must never take the session down,
+                    // but it must never vanish silently either — log each fault
+                    // so a missing layer is diagnosable from the session log.
+                    foreach (var inner in ex.Flatten().InnerExceptions)
+                        DiagnosticLogger.Log(
+                            $"Sacred layer task fault: {inner.GetType().Name}: {inner.Message}");
+                }
 
                 // For Dimensional Journey, compute per-sacred-layer emphasis at this
                 // chunk's mid-time. Each dimension foregrounds the layer(s) most
@@ -916,7 +929,13 @@ public sealed partial class SoundGenerator
                     float[]? layerData = sacredTasks[li].IsCompletedSuccessfully
                         ? sacredTasks[li].Result
                         : null;
-                    if (layerData == null) continue;
+                    if (layerData == null)
+                    {
+                        // Layer didn't complete (fault or 60s timeout) — skip it
+                        // this chunk, but leave a trace so the absence is visible.
+                        DiagnosticLogger.Log($"Sacred layer [{li}] skipped this chunk (not completed)");
+                        continue;
+                    }
 
                     float stFreq = sacredThetaFreqs[li];
                     float spFreq = sacredPhiFreqs[li];
@@ -997,7 +1016,9 @@ public sealed partial class SoundGenerator
         Action<float>? updateProgress = null,
         FrequencyMode freqMode = FrequencyMode.Standard)
     {
-        int totalSamples = (int)(sampleRate * duration);
+        // Double-precision sample count — mirrors GenerateStream exactly (dual
+        // pipeline rule) so batch and streaming agree on the session's length.
+        int totalSamples = (int)((double)sampleRate * duration);
         var result = new float[totalSamples, 2];
         int offset = 0;
 

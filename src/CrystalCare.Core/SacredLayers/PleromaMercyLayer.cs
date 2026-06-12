@@ -42,7 +42,7 @@ public sealed class PleromaMercyLayer : SacredLayerBase
     protected override float[] GenerateSignal(ReadOnlySpan<double> tChunk,
         float totalDuration, int n)
     {
-        var simplex = Simplex.Value!;
+        var simplex = Simplex;
 
         // Layer 1: 13-step Aeonic Ladder
         var aeonic = SacredConstants.AEONIC_EXPONENTS;

@@ -1,4 +1,3 @@
-using CrystalCare.Core.Frequencies;
 using CrystalCare.Core.Noise;
 
 namespace CrystalCare.Core.Dsp;
@@ -11,50 +10,6 @@ namespace CrystalCare.Core.Dsp;
 /// </summary>
 public static class FractalVariation
 {
-    // Full-signal fractal variation using simplex noise with LFO modulation.
-    #region Batch Computation
-
-    /// <summary>
-    /// Compute fractal frequency variation for a time array.
-    /// Uses simplex noise with octave-like layering for rich variation.
-    /// </summary>
-    public static float[] Compute(ReadOnlySpan<double> t, float baseFreq,
-        Simplex5D simplex, CancellationToken ct = default)
-    {
-        if (ct.IsCancellationRequested)
-            return new float[t.Length];
-
-        // LFO for modulation
-        var lfo = MicrotonalLfo.Generate(t, 0.01f);
-
-        // Simplex noise scaled by time — cast to float after scaling (small values OK)
-        var tScaled = new float[t.Length];
-        for (int i = 0; i < t.Length; i++)
-            tScaled[i] = (float)(t[i] * 0.02);
-
-        // Use baseFreq * 0.01 as y-offset to avoid degenerate seeds
-        var baseNoise = simplex.GenerateNoise(tScaled, baseFreq * 0.01f);
-
-        // Create "octaves" by scaling and phase-shifting
-        var variation = new float[t.Length];
-        int shift = t.Length / 8;
-
-        for (int i = 0; i < t.Length; i++)
-        {
-            float n = baseNoise[i];
-            int shiftedIdx = (i + shift) % t.Length;
-            float shifted = baseNoise[shiftedIdx];
-
-            variation[i] = n * 0.5f + shifted * 0.3f + n * n * 0.2f;
-            variation[i] *= 12.0f;
-            variation[i] *= (1.0f + 0.1f * lfo[i]);
-        }
-
-        return variation;
-    }
-
-    #endregion
-
     // Per-chunk fractal variation using shifted index trick on single noise array.
     // Simpler than dual-simplex but still produces rich organic variation.
     // Used by CrystallineResonanceLayer for crystal micro-variation.

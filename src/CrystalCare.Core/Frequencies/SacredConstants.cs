@@ -54,8 +54,14 @@ public static class SacredConstants
     #region Golden Angle
 
     // 360° × (1 − 1/φ) = 360° × (2 − φ) ≈ 137.5077°
+    // The radian form is 2π × (2 − φ) ≈ 2.39996 rad — the same 137.5° the degree
+    // constant expresses. (Until 2026-06-11 the radian constant carried an extra
+    // ÷2, making it the HALF golden angle ≈ 68.75° — the sunflower-seed phase
+    // offsets, the Blue Ray temporal braid, and the crystal boundary jitter were
+    // all built on the half-angle. Fixed with the user's approval so the code
+    // sounds the angle the doctrine documents.)
     public static readonly float GOLDEN_ANGLE_DEG = 360.0f * (2.0f - PHI);
-    public static readonly float GOLDEN_ANGLE_RAD = TWO_PI * (2.0f - PHI) / 2.0f;
+    public static readonly float GOLDEN_ANGLE_RAD = TWO_PI * (2.0f - PHI);
 
     #endregion
 

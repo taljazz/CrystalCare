@@ -37,6 +37,14 @@ public sealed class Simplex5D
     {
         var result = new float[t.Length];
 
+        // Layer 2: orthogonal variation (w parameter, independent of time).
+        // This layer does NOT depend on t — it's the same value for every sample
+        // of the call, so it's evaluated ONCE here instead of once per sample.
+        // (Same arithmetic, same blend order, bit-identical output — the per-sample
+        // evaluation in the original port wasted a third of every noise call.)
+        float n2Weighted = 0.3f * _noise2.GetNoise(
+            xOffset + wOffset, yOffset + wOffset, zOffset + wOffset);
+
         for (int i = 0; i < t.Length; i++)
         {
             float tVal = t[i];
@@ -45,37 +53,15 @@ public sealed class Simplex5D
             float n1 = _noise1.GetNoise(
                 xOffset + tVal, yOffset + tVal, zOffset + tVal);
 
-            // Layer 2: orthogonal variation (w parameter, independent of time)
-            float n2 = _noise2.GetNoise(
-                xOffset + wOffset, yOffset + wOffset, zOffset + wOffset);
-
             // Layer 3: PHI-modulated time + w coupling
             float n3 = _noise1.GetNoise(
                 xOffset + tVal * SacredConstants.PHI,
                 yOffset + tVal * SacredConstants.PHI,
                 zOffset + wOffset);
 
-            result[i] = 0.5f * n1 + 0.3f * n2 + 0.2f * n3;
+            result[i] = 0.5f * n1 + n2Weighted + 0.2f * n3;
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Generate multiple noise arrays in one call (reduces overhead).
-    /// Each parameter tuple is (y, z, w, v) — matching the C++ batch_generate.
-    /// </summary>
-    public float[][] BatchGenerate(ReadOnlySpan<float> t, (float y, float z, float w, float v)[] paramSets)
-    {
-        var results = new float[paramSets.Length][];
-
-        for (int j = 0; j < paramSets.Length; j++)
-        {
-            var p = paramSets[j];
-            // In C++ code, params are mapped: y->x_off, z->y_off, w->z_off, v->w_off
-            results[j] = GenerateNoise(t, p.y, p.z, p.w, p.v);
-        }
-
-        return results;
     }
 }

@@ -30,7 +30,7 @@ The result is sound that is always moving, always new, always rooted in the same
 6. Press **Play**.
 7. Close your eyes. Don't try to follow. Let your mind go where it wants.
 
-Streaming playback is unlimited in length. She uses ~50 MB of memory regardless of session duration.
+Streaming playback supports sessions up to 12 hours. She uses ~50 MB of memory regardless of session duration.
 
 ## The Seven Frequency Modes
 
@@ -136,7 +136,7 @@ She is Lemurian, not Atlantean: heart-based, organic, consciousness-driven — n
 
 - **Output Device**: dropdown auto-refreshes in real time; plug in or remove devices mid-session without restarting.
 - **Duration**: accepts plain minutes (`90`), hour/minute notation (`1h30m`), colon (`1:30`, `1:30:45`), or combined units (`2h 15m 30s`).
-- **Play**: streaming playback, unlimited length. Double-precision time arithmetic maintains stable resonance through sessions of any duration, including 12+ hours.
+- **Play**: streaming playback up to 12 hours per session. Double-precision time arithmetic maintains stable resonance through the entire session, hour after hour. For longer continuous coverage (room protection fields), start a fresh session — every session she sings is unique by design.
 - **Save as WAV**: generates the full session in memory and writes a WAV file. RAM-bound (see below).
 - **Batch Save**: generates multiple WAV files with fresh randomization for each.
 - **Stop**: cancels the current operation and stops playback.

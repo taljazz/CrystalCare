@@ -26,7 +26,6 @@ public static class MicrotonalLfo
     // Compute: generates LFO values for a time array using the pre-drawn params,
     //   with optional simplex-derived phase drift on the LFO carrier so the breath
     //   rhythm itself evolves over the session.
-    // Generate: convenience one-shot method combining DrawParams + Compute.
     #region Parameter Drawing and Computation
 
     public static LfoParams DrawParams(float baseFrequency, Random? rng = null)
@@ -92,14 +91,6 @@ public static class MicrotonalLfo
                 (1.0f + (float)System.Math.Sin(carrierPhase));
         }
         return result;
-    }
-
-    /// <summary>
-    /// Single-call LFO generation (for batch/non-streaming use).
-    /// </summary>
-    public static float[] Generate(ReadOnlySpan<double> t, float baseFrequency, Random? rng = null)
-    {
-        return Compute(t, DrawParams(baseFrequency, rng));
     }
 
     #endregion

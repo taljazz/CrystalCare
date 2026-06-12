@@ -101,6 +101,13 @@ public sealed partial class SoundGenerator
         var thetaPerturb = simplexPan.GenerateNoise(tScaled1);
         var phiPerturb = simplexPan.GenerateNoise(tScaled2, 1.0f);
 
+        // Rössler interpolation cursors — time ascends monotonically through the
+        // chunk, so each lookup walks the bracket forward O(1) instead of
+        // re-binary-searching the trajectory per sample. One cursor per series
+        // (X and Y share the same time array but advance independently).
+        int rosslerHintX = 0;
+        int rosslerHintY = 0;
+
         // Compute the raw toroidal pan curve with chaos and simplex perturbation.
         // Double precision phase for long-session stability.
         for (int i = 0; i < chunkSamples; i++)
@@ -112,8 +119,8 @@ public sealed partial class SoundGenerator
             double pp = 0.10f * phiPerturb[i];
 
             // Rössler chaotic perturbation: ±0.08 radians of bounded chaos (Interpolate takes float)
-            tp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.X, rossler.T, (float)time);
-            pp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.Y, rossler.T, (float)time);
+            tp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.X, rossler.T, (float)time, ref rosslerHintX);
+            pp += 0.08f * Math.RosslerAttractor.Interpolate(rossler.Y, rossler.T, (float)time, ref rosslerHintY);
 
             // Compute torus position in double: theta (horizontal) and phi (depth).
             // Optional slow drift offsets (per-chunk constants) shift the rotation's

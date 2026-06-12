@@ -77,6 +77,12 @@ public sealed class StreamingWaveProvider : IWaveProvider
             int bytesRemaining = count - bytesWritten;
             int framesToCopy = Math.Min(samplesAvailable, bytesRemaining / bytesPerFrame);
 
+            // Defensive: if the remaining buffer space is smaller than one stereo
+            // frame (count not frame-aligned — NAudio aligns to BlockAlign so this
+            // shouldn't happen), return what we have rather than spinning forever.
+            if (framesToCopy == 0)
+                return bytesWritten;
+
             for (int i = 0; i < framesToCopy; i++)
             {
                 int sampleIdx = _currentSample + i;
