@@ -10,7 +10,7 @@
     <ApplicationIcon />
     <AssemblyName>CrystalCare</AssemblyName>
     <Description>Sacred Frequency Healing Tone Generator</Description>
-    <Version>5.1.0</Version>
+    <Version>5.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
