@@ -16,9 +16,14 @@ namespace CrystalCare.Core.Generation;
 ///      — three documented healing carriers (Lemurian keynote, Taygetan
 ///      med-pod frequency, Solfeggio crown). Each session opens differently.
 ///
-///   2. The first 9 voices get split L/R by ±halfBeat for binaural sync.
-///      The 4 subharmonic body voices stay mono (their bottom voice is near
-///      27 Hz; splitting them would push R below audibility).
+///   2. The first 9 voices form a binaural pair — carried as a CONTINUOUS ±half-beat
+///      PHASE ramp on the un-split carriers (NOT a per-chunk frequency split), so the
+///      carriers never jump phase at a 3-second chunk seam while the beat drifts. The
+///      half-beat phase is accumulated across chunks in the streaming loop
+///      (taygetanBeatPhaseHalf) and handed to HarmonicGenerator as binauralStartPhase /
+///      binauralRadPerSec (+rate Left, −rate Right). The 4 subharmonic body voices stay
+///      mono (their bottom voice is near 27 Hz; a binaural split there would push R
+///      below audibility).
 ///
 ///   3. The half-beat is TAYGETAN_BEAT/2 = 3.85 Hz by default, plus simplex
 ///      drift (~200s period, ±0.25 Hz on the half) AND a slow ratio-driven
@@ -221,36 +226,10 @@ public sealed partial class SoundGenerator
         return SacredConstants.TAYGETAN_BEAT + beatDriftHz + ratioBias;
     }
 
-    /// <summary>
-    /// Build separate L and R frequency arrays for binaural separation.
-    /// First TaygetanBinauralVoiceCount entries (harmonic ladder + 1.3 ratios)
-    /// get split by ±halfBeat. Remaining entries (subharmonics) stay mono
-    /// because their bottom voice is too low for binaural perception.
-    /// </summary>
-    private static (float[] freqsL, float[] freqsR) ComputeTaygetanBinauralFreqs(
-        float[] allFrequencies, float halfBeat)
-    {
-        var freqsL = new float[allFrequencies.Length];
-        var freqsR = new float[allFrequencies.Length];
-
-        // First 9 voices — split L/R for binaural beat at the current drifted+biased rate
-        int splitCount = global::System.Math.Min(TaygetanBinauralVoiceCount, allFrequencies.Length);
-        for (int i = 0; i < splitCount; i++)
-        {
-            freqsL[i] = allFrequencies[i] + halfBeat;
-            freqsR[i] = allFrequencies[i] - halfBeat;
-        }
-
-        // Subharmonics stay mono — same value in both channels. No binaural
-        // beat in the body voices; they ground the sound.
-        for (int i = splitCount; i < allFrequencies.Length; i++)
-        {
-            freqsL[i] = allFrequencies[i];
-            freqsR[i] = allFrequencies[i];
-        }
-
-        return (freqsL, freqsR);
-    }
+    // NOTE: the former ComputeTaygetanBinauralFreqs (which split the field into ±halfBeat
+    // L/R frequency arrays per chunk) was removed when the binaural moved to a continuous
+    // half-beat PHASE ramp on the un-split carriers — the frequency split was the source
+    // of the per-chunk phase-jump seam. See the Taygetan branch in SoundGenerator.cs.
 
     #endregion
 

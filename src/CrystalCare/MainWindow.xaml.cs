@@ -508,13 +508,16 @@ public partial class MainWindow : Window, IMMNotificationClient
 
     /// <summary>
     /// Derive the base frequency for a given mode.
-    /// Modes 0-2: randomly pick from the mode's frequency list.
-    /// Modes 3-4: use 432 Hz (sacred geometry ratios multiply the base).
+    /// Modes 0, 2, 3, 4 (Standard, Atlantean, Pythagorean, Triple Helix): randomly
+    ///   pick from the mode's frequency set, then octave-fold into the clean register
+    ///   (see FoldBaseIntoCleanRegister) so the 13-voice field never climbs past the
+    ///   lowpass into triangle aliasing. The fold only actually moves Pythagorean's
+    ///   high geometric bases (up to 1296 Hz); the others are already below the ceiling.
+    /// Mode 1 (Higher Solfeggio): randomly pick from [852, 963] and DO NOT fold —
+    ///   being the high-register mode IS its identity; folding would neutralize it.
     /// Mode 5 (Taygetan): randomly pick from TAYGETAN_BASE_FREQS [432, 528, 963]
-    ///                    so each Taygetan session opens at a different
-    ///                    well-documented healing carrier — varies her up while
-    ///                    keeping every choice within Taygetan-validated tradition.
-    /// Mode 6 (Dimensional): always 432 Hz.
+    ///   so each session opens at a different well-documented healing carrier.
+    /// Mode 6 (Dimensional): always 432 Hz (the journey is anchored to the keynote).
     /// </summary>
     private float DeriveBaseFreq(FrequencyMode mode)
     {
@@ -536,22 +539,61 @@ public partial class MainWindow : Window, IMMNotificationClient
 
         var result = _frequencyManager.GetFrequencies(mode);
 
-        // Binaural modes return frequency pairs — use the left ear frequency.
-        // (No mode currently reaches this branch — Taygetan is handled above —
-        // but keep the path live for any future binaural mode that doesn't
-        // need a fixed anchor.)
+        // Pick the raw base from the mode's set. Binaural modes return frequency
+        // pairs — use the left-ear frequency. (No mode currently reaches the binaural
+        // branch — Taygetan is handled above — but keep it live for any future
+        // binaural mode that doesn't need a fixed anchor.)
+        float picked;
         if (result.IsBinaural && result.BinauralPairs!.Length > 0)
-        {
-            var pair = result.BinauralPairs[Random.Shared.Next(result.BinauralPairs.Length)];
-            return pair.Left;
-        }
+            picked = result.BinauralPairs[Random.Shared.Next(result.BinauralPairs.Length)].Left;
+        else if (result.Frequencies.Length > 0)
+            picked = result.Frequencies[Random.Shared.Next(result.Frequencies.Length)];
+        else
+            picked = 432f;  // Fallback to the Lemurian keynote
 
-        // Standard modes — pick a random frequency from the set
-        if (result.Frequencies.Length > 0)
-            return result.Frequencies[Random.Shared.Next(result.Frequencies.Length)];
+        // Higher Solfeggio (mode 1) is EXEMPT from the octave-fold by design: being
+        // the high-register mode is its identity (the "Higher Frequencies" set,
+        // 852/963). Folding would drop its keynote an octave and neutralize that. Its
+        // top (quietest) voice rolls off the lowpass just like Taygetan's 963 base —
+        // accepted by the same reasoning that keeps Taygetan happy at 963.
+        if (mode == FrequencyMode.Solfeggio)
+            return picked;
 
-        // Fallback to 432 Hz (Lemurian keynote)
-        return 432f;
+        // Every other standard mode: octave-fold the picked base into the clean
+        // register so the 13-voice field's top voice (base × φ^5) can't climb past the
+        // lowpass into triangle aliasing. Surgical — only Pythagorean's high geometric
+        // bases actually move; Standard / Atlantean / Triple Helix are already below
+        // the ceiling and pass through unchanged.
+        return FoldBaseIntoCleanRegister(picked);
+    }
+
+    /// <summary>
+    /// Octave-fold a base frequency down into the clean register. The 13-voice field
+    /// built around the base reaches its highest voice at base × φ^5 (≈ base × 11.09);
+    /// keeping the base below the ceiling keeps that top voice clear of the ~5500 Hz
+    /// lowpass and of the triangle-harmonic aliasing that sets in once a voice climbs
+    /// past ~8000 Hz (its 3rd harmonic folds back under Nyquist). Folding is by whole
+    /// octaves (÷2), so the base's pitch CLASS is preserved — only its register drops.
+    /// Bases already below the ceiling return unchanged, so the well-behaved modes are
+    /// never touched; only outliers (Pythagorean's geometric products up to 1296 Hz)
+    /// get pulled in, tightening its 562–1296 Hz spread to a consistent ~305–562 Hz.
+    /// </summary>
+    private static float FoldBaseIntoCleanRegister(float baseFreq)
+    {
+        // Guard a non-positive / absurd input so the fold loop always terminates.
+        if (baseFreq <= 0f) return 432f;
+
+        // Ceiling = Lemurian keynote × Metatron's √2 (≈ 610.94 Hz). √2 is the sacred
+        // constant at full precision (Metatron's Cube diagonal); a base at/above this
+        // would push the field's top voice past ~6.8 kHz. Sits just above Triple
+        // Helix's highest base (604.8 Hz) so that mode passes through untouched.
+        float ceiling = SacredConstants.MERKABA_KEYNOTE * SacredConstants.SQRT_2;
+
+        // Fold down by whole octaves until under the ceiling. Pitch class preserved.
+        float folded = baseFreq;
+        while (folded >= ceiling)
+            folded *= 0.5f;
+        return folded;
     }
 
     /// <summary>

@@ -143,12 +143,30 @@ public sealed partial class SoundGenerator
         for (int i = 0; i < chunkSamples; i++)
             panCurve[i] += driftAmp * (float)System.Math.Sin(SacredConstants.TWO_PI_D * driftFreq * tChunk[i]);
 
-        // Apply the computed pan curve to the stereo signal
+        // Apply the computed pan curve to the stereo signal using a constant-power
+        // (equal-power) law rather than a straight linear tilt. The pan position is
+        // mapped onto a quarter circle: left = √2·cos(angle), right = √2·sin(angle),
+        // with angle = (panScaled + 1)·π/4. Because cos²+sin² = 1, the total acoustic
+        // power L²+R² stays constant as the sound moves off center — there is no
+        // loudness pump with pan position (the old linear 1∓panScaled law let BOTH
+        // gains drift above unity, adding power as it panned away from center). The
+        // √2 (Metatron's diagonal — from SacredConstants, full precision) anchors the
+        // center to unity gain: √2·cos(π/4) = √2·sin(π/4) = 1, so center loudness — and
+        // the normalization headroom calibrated around it — is unchanged. The ear-tuned
+        // 0.6 pan width is preserved; it now sets how far panScaled swings INTO the
+        // curve. cos/sin keep the placement on clean sine math, matching the rest of
+        // the modulators. Peak gain is also lower than the linear law (≈1.30 vs 1.48 at
+        // full pan), so this is strictly gentler on headroom, never harsher.
+        const float quarterPi = MathF.PI / 4f;
+        float sqrt2 = SacredConstants.SQRT_2;  // √2 — anchors the equal-power center to unity gain
         for (int i = 0; i < chunkSamples; i++)
         {
-            float panScaled = panCurve[i] * 0.6f;
-            waveLeft[i] *= (1.0f - panScaled);   // Left gets louder as pan goes left
-            waveRight[i] *= (1.0f + panScaled);  // Right gets louder as pan goes right
+            // panCurve is tanh-bounded to ±0.8, so panScaled stays in ~[-0.49, 0.49]
+            // and the angle stays within (0, π/2) — both gains remain positive and the
+            // sound sweeps between the channels without ever inverting polarity.
+            float angle = (panCurve[i] * 0.6f + 1.0f) * quarterPi;
+            waveLeft[i] *= sqrt2 * MathF.Cos(angle);   // left dominant as pan goes negative
+            waveRight[i] *= sqrt2 * MathF.Sin(angle);  // right dominant as pan goes positive
         }
     }
 

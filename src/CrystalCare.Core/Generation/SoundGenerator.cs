@@ -544,6 +544,14 @@ public sealed partial class SoundGenerator
         // Pre-allocate reusable buffers — saves ~4 MB of GC allocations per chunk
         var pool = new ChunkBufferPool(chunkSize);
 
+        // Taygetan binaural continuity accumulator (radians). Holds the accumulated
+        // half-beat phase at the START of the current chunk. Each Taygetan chunk reads
+        // it as the anchor for that chunk's binaural phase ramp, then advances it by the
+        // half-beat phase accrued across the chunk. This is what keeps the 9 binaural
+        // carriers phase-continuous across 3-second seams while the beat still drifts +
+        // walks the 7 sacred ratios over the session. Unused (stays 0) for other modes.
+        double taygetanBeatPhaseHalf = 0.0;
+
         // The main generation loop — processes one 3-second chunk per iteration.
         // Each chunk passes through all 16 stages sequentially, then sacred layers
         // are computed in parallel and mixed in with independent toroidal panning.
@@ -667,7 +675,7 @@ public sealed partial class SoundGenerator
             float[] waveLeft, waveRight;
             if (hasTaygetan)
             {
-                // Taygetan: split first 9 voices L/R for binaural; subharmonics mono.
+                // Taygetan: the first 9 voices form a binaural pair; subharmonics mono.
                 // Beat = TAYGETAN_BEAT + simplex drift + ratio-driven bias from the
                 // temporal schedule. The 7 sacred ratios express through the beat's
                 // gentle evolution over the session — root holds 7.7 Hz, transcendentals
@@ -678,27 +686,49 @@ public sealed partial class SoundGenerator
                     taygetanRatioSchedule, taygetanRatioValues!);
                 float halfBeat = currentBeat * 0.5f;
 
-                var (taygetanFreqsL, taygetanFreqsR) =
-                    ComputeTaygetanBinauralFreqs(allFrequencies, halfBeat);
+                // The binaural is carried as a CONTINUOUS phase ramp, not a per-chunk
+                // frequency split. The carriers stay at the un-split allFrequencies; the
+                // generator adds ±(taygetanBeatPhaseHalf + halfBeatRad·localTime) to the
+                // leading 9 voices. binauralRadPerSec = +2π·halfBeat for Left, −2π·halfBeat
+                // for Right — the interaural phase difference IS the 7.7 Hz beat. Because
+                // taygetanBeatPhaseHalf carries the accumulated phase from the previous
+                // chunk, the carriers join seamlessly across the 3-second seam even though
+                // halfBeat changed: only the slope (frequency) steps, never the phase.
+                // (The old code folded ±halfBeat into the carrier frequency × absolute
+                // time, which jumped by 2π·Δhalfbeat·t at every boundary — up to ~180°,
+                // growing through the session. This removes that seam entirely.)
+                double binauralRad = SacredConstants.TWO_PI_D * halfBeat;
 
-                // Same generator call as standard modes — just with separate L/R
-                // freq arrays + sineLeadingCount = TaygetanBinauralVoiceCount (9).
-                // The first 9 voices stay pure sine because they're the binaural
-                // carriers — L/R difference detection in the brain entrains cleanest
-                // when the carriers are pure single-frequency tones. The remaining
-                // 4 subharmonic body voices get the default Triangle shape,
-                // contributing the Tesla 3-6-9 + Pythagorean 5 + Solfeggio crown
-                // harmonics that come inherent in the triangle waveform.
+                // Same generator call as standard modes, with the un-split field +
+                // sineLeadingCount = TaygetanBinauralVoiceCount (9). The first 9 voices
+                // stay pure sine because they're the binaural carriers — L/R difference
+                // detection in the brain entrains cleanest when the carriers are pure
+                // single-frequency tones. The remaining 4 subharmonic body voices get the
+                // default Triangle shape, contributing the Tesla 3-6-9 + Pythagorean 5 +
+                // Solfeggio crown harmonics inherent in the triangle waveform. They get no
+                // binaural phase (they're past the leading count) so they stay mono.
                 waveLeft = HarmonicGenerator.GenerateHarmonics(
-                    tChunk, taygetanFreqsL, envelope, lfoLeft, modDepths,
+                    tChunk, allFrequencies, envelope, lfoLeft, modDepths,
                     fractalVar, PhaseModulationScale,
                     waveShape: WaveShape.Triangle,
-                    sineLeadingCount: TaygetanBinauralVoiceCount);
+                    sineLeadingCount: TaygetanBinauralVoiceCount,
+                    binauralStartPhase: taygetanBeatPhaseHalf,
+                    binauralRadPerSec: binauralRad);
                 waveRight = HarmonicGenerator.GenerateHarmonics(
-                    tChunk, taygetanFreqsR, envelope, lfoRight, modDepths,
+                    tChunk, allFrequencies, envelope, lfoRight, modDepths,
                     fractalVar, PhaseModulationScale,
                     waveShape: WaveShape.Triangle,
-                    sineLeadingCount: TaygetanBinauralVoiceCount);
+                    sineLeadingCount: TaygetanBinauralVoiceCount,
+                    binauralStartPhase: -taygetanBeatPhaseHalf,
+                    binauralRadPerSec: -binauralRad);
+
+                // Advance the accumulator by the half-beat phase accrued across THIS
+                // chunk's span, so the next chunk's ramp begins exactly where this one
+                // ends. Wrap into [0, 2π) to keep the double bounded over long sessions
+                // (sin is 2π-periodic, so wrapping is exact, not an approximation).
+                taygetanBeatPhaseHalf += binauralRad * (chunkSamples / (double)sampleRate);
+                taygetanBeatPhaseHalf %= SacredConstants.TWO_PI_D;
+                if (taygetanBeatPhaseHalf < 0) taygetanBeatPhaseHalf += SacredConstants.TWO_PI_D;
             }
             else
             {
@@ -924,6 +954,16 @@ public sealed partial class SoundGenerator
                 // Mix each sacred layer into the stereo field with independent toroidal panning.
                 // Each layer's panning starts at a golden angle offset from the previous,
                 // ensuring maximum spatial separation like sunflower seeds on a torus.
+                // Placement uses the SAME constant-power (equal-power) law as the main
+                // signal panner (see ApplyToroidalPanning in SoundGenerator.Effects.cs):
+                // L = √2·cos(angle), R = √2·sin(angle), angle = (panScaled + 1)·π/4. Total
+                // power per layer stays constant across pan position (no loudness pump as a
+                // layer drifts around its torus) and center is unity gain (√2·cos(π/4) = 1),
+                // so a centered layer — including Blue Ray, which is locked dead-center —
+                // mixes in exactly as it did under the old linear law. Constants hoisted
+                // out of both the layer loop and the per-sample loop.
+                const float sacredQuarterPi = MathF.PI / 4f;
+                float sacredSqrt2 = SacredConstants.SQRT_2;  // √2 — equal-power center anchor
                 for (int li = 0; li < sacredLayers.Length; li++)
                 {
                     float[]? layerData = sacredTasks[li].IsCompletedSuccessfully
@@ -960,11 +1000,14 @@ public sealed partial class SoundGenerator
                             (float)System.Math.Cos(sThetaD) / (sacredR + sacredRSmall);
                         float panScaled = sacredPan * 0.4f;
 
-                        // Mix into left and right channels with pan weighting,
-                        // scaled by the per-dimension layer emphasis (1.0 for non-Mode-7).
+                        // Mix into left and right channels with constant-power pan
+                        // weighting, scaled by the per-dimension layer emphasis (1.0 for
+                        // non-Mode-7). panScaled stays in ~[-0.4, 0.4] here (sacredPan ×
+                        // 0.4), so angle stays within (0, π/2) and both gains stay positive.
                         float emphasized = layerData[i] * dimEmphasis;
-                        waveLeft[i] += emphasized * (1.0f - panScaled);
-                        waveRight[i] += emphasized * (1.0f + panScaled);
+                        float sacredAngle = (panScaled + 1.0f) * sacredQuarterPi;
+                        waveLeft[i] += emphasized * sacredSqrt2 * MathF.Cos(sacredAngle);
+                        waveRight[i] += emphasized * sacredSqrt2 * MathF.Sin(sacredAngle);
                     }
                 }
             }
